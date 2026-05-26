@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Copyright (c) 2026 Francisco Daniel Castro Borrome. Todos los derechos reservados.
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/obsidian"
+    android:keepScreenOn="true"
+    android:fitsSystemWindows="false">
+
+    <!-- ── Full-screen drawing canvas ──────────────────────────────────── -->
+    <View
+        android:id="@+id/drawingCanvas"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="@android:color/transparent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- ── Idle overlay (pre-connection) ───────────────────────────────── -->
+    <LinearLayout
+        android:id="@+id/overlayIdle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:visibility="visible"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <!-- Pulsing orange dot -->
+        <View
+            android:id="@+id/pulseDot"
+            android:layout_width="8dp"
+            android:layout_height="8dp"
+            android:layout_gravity="center"
+            android:layout_marginBottom="20dp"
+            android:background="@drawable/shape_circle_orange" />
+
+        <TextView
+            android:id="@+id/tvIdleLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="01. BUSCANDO HOST..."
+            android:textColor="@color/signal_orange"
+            android:textSize="13sp"
+            android:letterSpacing="0.15"
+            android:fontFamily="monospace" />
+
+    </LinearLayout>
+
+    <!-- ── Diagnostic HUD (top-left corner, visible only while drawing) ── -->
+    <TextView
+        android:id="@+id/tvHud"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="16dp"
+        android:text="P: 0000 | T: +00° | L: 0.0ms"
+        android:textColor="@color/signal_orange"
+        android:textSize="9sp"
+        android:fontFamily="monospace"
+        android:letterSpacing="0.05"
+        android:alpha="0"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- ── Floating action button (bottom-right) ───────────────────────── -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabMenu"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="24dp"
+        android:layout_marginBottom="32dp"
+        android:contentDescription="Menú"
+        app:backgroundTint="@color/signal_orange"
+        app:elevation="0dp"
+        app:fabSize="mini"
+        app:srcCompat="@android:drawable/ic_input_add"
+        app:tint="@color/obsidian"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

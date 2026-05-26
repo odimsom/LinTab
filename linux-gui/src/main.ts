@@ -1,0 +1,184 @@
+// Copyright (c) 2026 Francisco Daniel Castro Borrome. Todos los derechos reservados.
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+import { invoke } from "@tauri-apps/api/core";
+
+// ── Types (mirrors core-daemon IPC) ──────────────────────────────────────────
+
+interface DaemonStatus {
+  running: boolean;
+  version: string;
+}
+
+interface ScanResult {
+  mdns: Array<{ name: string; addr: string }>;
+  adb:  Array<{ serial: string; state: string }>;
+}
+
+// ── DOM refs ──────────────────────────────────────────────────────────────────
+
+const statusEl    = document.getElementById("status-value")!;
+const socketEl    = document.getElementById("socket-path")!;
+const deviceList  = document.getElementById("device-list")!;
+const linkError   = document.getElementById("link-error") as HTMLElement;
+const consoleLog  = document.getElementById("console-log")!;
+const quadLink    = document.getElementById("quad-link")!;
+
+const btnScan     = document.getElementById("btn-scan")!;
+const btnRestart  = document.getElementById("btn-restart")!;
+
+const barPressure = document.getElementById("bar-pressure") as HTMLElement;
+const valPressure = document.getElementById("val-pressure")!;
+const barTiltX    = document.getElementById("bar-tilt-x") as HTMLElement;
+const valTiltX    = document.getElementById("val-tilt-x")!;
+const barTiltY    = document.getElementById("bar-tilt-y") as HTMLElement;
+const valTiltY    = document.getElementById("val-tilt-y")!;
+
+// ── Console logger ────────────────────────────────────────────────────────────
+
+function log(msg: string, level: "info" | "ok" | "warn" | "error" = "info"): void {
+  const ts   = new Date().toLocaleTimeString("es-AR", { hour12: false });
+  const line = document.createElement("span");
+  line.className = `log-line ${level === "info" ? "" : level}`;
+  line.textContent = `[${ts}] ${msg}`;
+  consoleLog.appendChild(line);
+  consoleLog.scrollTop = consoleLog.scrollHeight;
+}
+
+// ── Daemon status ─────────────────────────────────────────────────────────────
+
+async function refreshStatus(): Promise<void> {
+  try {
+    const data = await invoke<DaemonStatus>("get_daemon_status");
+    statusEl.textContent = data.running ? "DAEMON ACTIVO" : "DAEMON INACTIVO";
+    statusEl.classList.toggle("active", data.running);
+    socketEl.textContent = "$XDG_RUNTIME_DIR/lintab.sock";
+    log(`Daemon v${data.version} — activo`, "ok");
+  } catch {
+    statusEl.textContent = "DAEMON INACTIVO";
+    statusEl.classList.remove("active");
+    log("ERROR 04: SOCKET NO ENCONTRADO. VERIFICA PERMISOS UDEV.", "error");
+  }
+}
+
+// ── Scan devices ──────────────────────────────────────────────────────────────
+
+async function handleScan(): Promise<void> {
+  btnScan.textContent  = "ESCANEANDO...";
+  btnScan.setAttribute("disabled", "true");
+  deviceList.innerHTML = "";
+  linkError.hidden     = true;
+
+  try {
+    const result = await invoke<ScanResult>("scan_devices");
+    const all: Array<{ label: string; addr: string; type: string }> = [
+      ...result.mdns.map(d => ({ label: d.name, addr: d.addr, type: "mDNS" })),
+      ...result.adb.map(d  => ({ label: d.serial, addr: d.serial, type: `ADB·${d.state}` })),
+    ];
+
+    if (all.length === 0) {
+      log("Escaneo completado — sin dispositivos detectados.", "warn");
+      linkError.textContent = "SIN DISPOSITIVOS. ABRE LA APP EN TU ANDROID.";
+      linkError.hidden = false;
+    } else {
+      all.forEach(dev => {
+        const item = document.createElement("div");
+        item.className = "device-item";
+        item.innerHTML = `
+          <span>${dev.label}</span>
+          <span class="dev-type">${dev.type}</span>
+          <span class="dev-connect">CONECTAR_</span>`;
+        item.addEventListener("click", () => connectDevice(dev.addr, dev.type));
+        deviceList.appendChild(item);
+      });
+      log(`Escaneo completado — ${all.length} dispositivo(s) encontrado(s).`, "ok");
+    }
+  } catch (e) {
+    log(`ERROR: ${e}`, "error");
+    linkError.textContent = `ERROR: ${e}`;
+    linkError.hidden = false;
+  } finally {
+    btnScan.textContent = "ESCANEAR DISPOSITIVOS_";
+    btnScan.removeAttribute("disabled");
+  }
+}
+
+// ── Connect ───────────────────────────────────────────────────────────────────
+
+async function connectDevice(addr: string, type: string): Promise<void> {
+  log(`Iniciando vínculo con ${addr} (${type})…`);
+  try {
+    const result = await invoke("connect_device", {
+      ip: type.startsWith("ADB") ? undefined : addr,
+      dname: undefined,
+    });
+    log(`VÍNCULO ESTABLECIDO — ${JSON.stringify(result)}`, "ok");
+
+    // Flash orange on the Link block (design system feedback rule)
+    quadLink.classList.remove("flash");
+    void quadLink.offsetWidth; // reflow to restart animation
+    quadLink.classList.add("flash");
+  } catch (e) {
+    log(`ERROR DE VÍNCULO: ${e}`, "error");
+  }
+}
+
+// ── Mapping — monitor + rotation ─────────────────────────────────────────────
+
+document.querySelectorAll(".monitor-item").forEach(el => {
+  el.addEventListener("click", () => {
+    document.querySelectorAll(".monitor-item").forEach(m => m.classList.remove("selected"));
+    el.classList.add("selected");
+  });
+});
+
+document.querySelectorAll(".rot-btn").forEach(btn => {
+  btn.addEventListener("click", async () => {
+    document.querySelectorAll(".rot-btn").forEach(b => b.classList.remove("selected"));
+    btn.classList.add("selected");
+    const deg = Number((btn as HTMLElement).dataset["deg"] ?? 0);
+    try {
+      await invoke("set_tablet_mapping", {
+        screenX: 0, screenY: 0, screenWidth: 1920, screenHeight: 1080, rotation: deg,
+      });
+      log(`Mapping actualizado — rotación ${deg}°`, "ok");
+    } catch (e) {
+      log(`Error al actualizar mapping: ${e}`, "error");
+    }
+  });
+});
+
+// ── Restart daemon ────────────────────────────────────────────────────────────
+
+btnRestart.addEventListener("click", async () => {
+  log("Reiniciando daemon…", "warn");
+  try {
+    await invoke("disconnect_device");
+  } catch { /* daemon may already be down */ }
+  await refreshStatus();
+});
+
+// ── Pressure / tilt demo (real data comes from IPC events) ───────────────────
+
+export function updatePrecision(pressure: number, tiltX: number, tiltY: number): void {
+  const pPct = Math.round((pressure / 8191) * 100);
+  barPressure.style.width = `${pPct}%`;
+  valPressure.textContent = String(pressure).padStart(4, "0");
+
+  const txPct = Math.round(((tiltX + 90) / 180) * 100);
+  barTiltX.style.width = `${txPct}%`;
+  valTiltX.textContent = `${tiltX >= 0 ? "+" : ""}${tiltX}°`;
+
+  const tyPct = Math.round(((tiltY + 90) / 180) * 100);
+  barTiltY.style.width = `${tyPct}%`;
+  valTiltY.textContent = `${tiltY >= 0 ? "+" : ""}${tiltY}°`;
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
+btnScan.addEventListener("click", handleScan);
+
+document.addEventListener("DOMContentLoaded", () => {
+  log("LinTab GUI iniciando…");
+  refreshStatus();
+});

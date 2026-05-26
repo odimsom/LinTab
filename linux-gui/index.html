@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<!-- Copyright (c) 2026 Francisco Daniel Castro Borrome. Todos los derechos reservados. -->
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LinTab</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Inter:wght@400;700&family=JetBrains+Mono:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div id="app">
+
+      <!-- ── HEADER HERO ──────────────────────────────────────────────── -->
+      <header id="hero">
+        <div class="hero-eyebrow mono">01.</div>
+        <h1 class="hero-title">TU HARDWARE, EN LINUX.</h1>
+        <div class="hero-meta">
+          <span class="meta-label">STATUS:</span>
+          <span id="status-value" class="meta-value mono">DAEMON INACTIVO</span>
+          <span class="meta-sep">|</span>
+          <span class="meta-label">DRIVER:</span>
+          <span class="meta-value mono">uinput_0</span>
+          <span class="meta-sep">|</span>
+          <span class="meta-label">SOCKET:</span>
+          <span id="socket-path" class="meta-value mono">—</span>
+        </div>
+      </header>
+
+      <!-- ── CUADRANTE TÉCNICO ────────────────────────────────────────── -->
+      <main id="grid">
+
+        <!-- 01 · LINK -->
+        <section class="quad" id="quad-link">
+          <div class="quad-header">
+            <span class="quad-num mono">01</span>
+            <span class="quad-title">LINK_</span>
+          </div>
+          <div class="quad-body">
+            <button class="btn-primary" id="btn-scan">ESCANEAR DISPOSITIVOS_</button>
+            <div id="device-list" class="device-list"></div>
+            <p id="link-error" class="inline-error mono" hidden></p>
+          </div>
+        </section>
+
+        <!-- 02 · PRECISIÓN -->
+        <section class="quad" id="quad-precision">
+          <div class="quad-header">
+            <span class="quad-num mono">02</span>
+            <span class="quad-title">PRECISIÓN_</span>
+          </div>
+          <div class="quad-body">
+            <div class="meter-row">
+              <span class="meter-label mono">PRESIÓN</span>
+              <div class="bar-track"><div id="bar-pressure" class="bar-fill"></div></div>
+              <span id="val-pressure" class="meter-val mono">0000</span>
+            </div>
+            <div class="meter-row">
+              <span class="meter-label mono">INCL X</span>
+              <div class="bar-track"><div id="bar-tilt-x" class="bar-fill tilt"></div></div>
+              <span id="val-tilt-x" class="meter-val mono">+00°</span>
+            </div>
+            <div class="meter-row">
+              <span class="meter-label mono">INCL Y</span>
+              <div class="bar-track"><div id="bar-tilt-y" class="bar-fill tilt"></div></div>
+              <span id="val-tilt-y" class="meter-val mono">+00°</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- 03 · MAPPING -->
+        <section class="quad" id="quad-mapping">
+          <div class="quad-header">
+            <span class="quad-num mono">03</span>
+            <span class="quad-title">MAPPING_</span>
+          </div>
+          <div class="quad-body">
+            <div class="monitor-list">
+              <div class="monitor-item selected" data-monitor="0">
+                PANTALLA 0 · 1920×1080
+              </div>
+              <div class="monitor-item" data-monitor="1">
+                PANTALLA 1 · —
+              </div>
+            </div>
+            <div class="rotation-row">
+              <span class="meter-label mono">ROTACIÓN</span>
+              <div class="rot-group">
+                <button class="rot-btn selected" data-deg="0">0°</button>
+                <button class="rot-btn" data-deg="90">90°</button>
+                <button class="rot-btn" data-deg="180">180°</button>
+                <button class="rot-btn" data-deg="270">270°</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 04 · CONSOLA -->
+        <section class="quad" id="quad-console">
+          <div class="quad-header">
+            <span class="quad-num mono">04</span>
+            <span class="quad-title">CONSOLA_</span>
+          </div>
+          <div class="quad-body">
+            <div id="console-log" class="console-log mono"></div>
+          </div>
+        </section>
+
+      </main>
+
+      <!-- ── FOOTER OPERATIVO ─────────────────────────────────────────── -->
+      <footer id="footer">
+        <span class="footer-text mono">
+          © 2026 FRANCISCO DANIEL CASTRO BORROME · GPL-3.0
+        </span>
+        <span class="footer-text mono" id="footer-ver">v0.1.0</span>
+        <button class="btn-ghost" id="btn-restart">REINICIAR DAEMON_</button>
+      </footer>
+
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

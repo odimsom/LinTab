@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (c) 2026 Francisco Daniel Castro Borrome. Todos los derechos reservados. -->
+<resources>
+    <style name="Theme.LinTab" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- Obsidian background for OLED battery savings -->
+        <item name="android:windowBackground">@color/obsidian</item>
+        <item name="android:statusBarColor">@color/obsidian</item>
+        <item name="android:navigationBarColor">@color/obsidian</item>
+        <item name="android:windowLightStatusBar">false</item>
+
+        <!-- Signal Orange as the sole accent color -->
+        <item name="colorPrimary">@color/signal_orange</item>
+        <item name="colorPrimaryVariant">@color/signal_orange</item>
+        <item name="colorOnPrimary">@color/obsidian</item>
+        <item name="colorSecondary">@color/signal_orange</item>
+        <item name="colorOnSecondary">@color/obsidian</item>
+
+        <!-- Full-screen immersive drawing area -->
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+    </style>
+</resources>

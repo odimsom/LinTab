@@ -1,0 +1,37 @@
+# Rust
+target/
+Cargo.lock
+**/*.rs.bk
+
+# Android / Kotlin
+*.iml
+.gradle/
+.idea/
+local.properties
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# Node / Frontend
+node_modules/
+dist/
+.parcel-cache/
+.vite/
+
+# Tauri
+linux-gui/src-tauri/target/
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Env
+.env
+.env.local
