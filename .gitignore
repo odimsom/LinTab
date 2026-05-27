@@ -35,3 +35,6 @@ Thumbs.db
 # Env
 .env
 .env.local
+# TypeScript generated JS
+src/**/*.js
+src/**/*.js.map
