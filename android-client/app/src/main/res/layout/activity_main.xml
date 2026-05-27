@@ -23,6 +23,19 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
+    <!-- ── Stylus trail overlay (Signal Orange fading comet tail) ───────── -->
+    <com.lintab.client.ui.TrailView
+        android:id="@+id/trailView"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="@android:color/transparent"
+        android:clickable="false"
+        android:focusable="false"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
     <!-- ── Idle overlay (pre-connection) ───────────────────────────────── -->
     <LinearLayout
         android:id="@+id/overlayIdle"

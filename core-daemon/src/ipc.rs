@@ -28,14 +28,18 @@ pub enum IpcCommand {
     },
     /// Tear down the active tablet session.
     Disconnect,
-    /// Update the screen-to-tablet mapping.
+    /// Update the screen-to-tablet mapping and input mode.
     SetMapping {
         screen_x: u32,
         screen_y: u32,
         screen_width: u32,
         screen_height: u32,
         rotation: u32,
+        #[serde(default)]
+        relative_mode: bool,
     },
+    /// Returns last received pressure/tilt snapshot for the GUI to display.
+    GetPrecision,
 }
 
 /// Response envelope sent back for every command.

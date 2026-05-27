@@ -16,6 +16,10 @@ const barTiltX = document.getElementById("bar-tilt-x");
 const valTiltX = document.getElementById("val-tilt-x");
 const barTiltY = document.getElementById("bar-tilt-y");
 const valTiltY = document.getElementById("val-tilt-y");
+const btnRelative = document.getElementById("btn-relative");
+const btnAbsolute = document.getElementById("btn-absolute");
+// ── Shared mapping state ──────────────────────────────────────────────────────
+let relativeMode = true;
 // ── Console logger ────────────────────────────────────────────────────────────
 function log(msg, level = "info") {
     const ts = new Date().toLocaleTimeString("es-AR", { hour12: false });
@@ -62,14 +66,14 @@ function showSetupGuide() {
     setupMsg.innerHTML = `
     <div style="
       background: #1a1a1a;
-      border: 2px solid #2196F3;
+      border: 2px solid #FF4F00;
       border-radius: 8px;
       padding: 2rem;
       max-width: 700px;
       text-align: left;
       line-height: 1.6;
     ">
-      <h2 style="color: #2196F3; margin-top: 0; font-size: 1.5rem;">
+      <h2 style="color: #FF4F00; margin-top: 0; font-size: 1.5rem;">
         ⚠️ CONFIGURACIÓN INICIAL REQUERIDA
       </h2>
       
@@ -113,7 +117,7 @@ function showSetupGuide() {
       </p>
       
       <button id="close-setup" style="
-        background: #2196F3;
+        background: #FF4F00;
         color: white;
         border: none;
         padding: 0.8rem 1.5rem;
@@ -178,7 +182,7 @@ async function connectDevice(addr, type) {
     log(`Iniciando vínculo con ${addr} (${type})…`);
     try {
         const result = await invoke("connect_device", {
-            ip: type.startsWith("ADB") ? undefined : addr,
+            ip: type.startsWith("ADB") ? "127.0.0.1" : addr,
             dname: undefined,
         });
         log(`VÍNCULO ESTABLECIDO — ${JSON.stringify(result)}`, "ok");
@@ -198,21 +202,52 @@ document.querySelectorAll(".monitor-item").forEach(el => {
         el.classList.add("selected");
     });
 });
+async function applyMapping(rotation) {
+    await invoke("set_tablet_mapping", {
+        screenX: 0, screenY: 0, screenWidth: 1920, screenHeight: 1080,
+        rotation,
+        relativeMode,
+    });
+}
 document.querySelectorAll(".rot-btn").forEach(btn => {
     btn.addEventListener("click", async () => {
         document.querySelectorAll(".rot-btn").forEach(b => b.classList.remove("selected"));
         btn.classList.add("selected");
         const deg = Number(btn.dataset["deg"] ?? 0);
         try {
-            await invoke("set_tablet_mapping", {
-                screenX: 0, screenY: 0, screenWidth: 1920, screenHeight: 1080, rotation: deg,
-            });
-            log(`Mapping actualizado — rotación ${deg}°`, "ok");
+            await applyMapping(deg);
+            log(`Mapping actualizado — rotación ${deg}°, modo ${relativeMode ? "relativo" : "absoluto"}`, "ok");
         }
         catch (e) {
             log(`Error al actualizar mapping: ${e}`, "error");
         }
     });
+});
+btnRelative.addEventListener("click", async () => {
+    relativeMode = true;
+    btnRelative.classList.add("selected");
+    btnAbsolute.classList.remove("selected");
+    const activeDeg = Number(document.querySelector(".rot-btn.selected")?.dataset["deg"] ?? 0);
+    try {
+        await applyMapping(activeDeg);
+        log("Modo relativo activado — el cursor sigue el delta del stylus.", "ok");
+    }
+    catch (e) {
+        log(`Error al cambiar modo: ${e}`, "error");
+    }
+});
+btnAbsolute.addEventListener("click", async () => {
+    relativeMode = false;
+    btnAbsolute.classList.add("selected");
+    btnRelative.classList.remove("selected");
+    const activeDeg = Number(document.querySelector(".rot-btn.selected")?.dataset["deg"] ?? 0);
+    try {
+        await applyMapping(activeDeg);
+        log("Modo absoluto activado — el cursor mapea la posición literal.", "ok");
+    }
+    catch (e) {
+        log(`Error al cambiar modo: ${e}`, "error");
+    }
 });
 // ── Restart daemon ────────────────────────────────────────────────────────────
 btnRestart.addEventListener("click", async () => {
@@ -223,8 +258,20 @@ btnRestart.addEventListener("click", async () => {
     catch { /* daemon may already be down */ }
     await refreshStatus();
 });
-// ── Pressure / tilt demo (real data comes from IPC events) ───────────────────
-export function updatePrecision(pressure, tiltX, tiltY) {
+// ── Precision polling ─────────────────────────────────────────────────────────
+async function refreshPrecision() {
+    try {
+        const data = await invoke("get_precision");
+        if (data) {
+            updatePrecision(data.pressure, data.tilt_x, data.tilt_y);
+        }
+    }
+    catch {
+        // Daemon not running — ignore silently, bars stay at last value
+    }
+}
+// ── Pressure / tilt ───────────────────────────────────────────────────────────
+function updatePrecision(pressure, tiltX, tiltY) {
     const pPct = Math.round((pressure / 8191) * 100);
     barPressure.style.width = `${pPct}%`;
     valPressure.textContent = String(pressure).padStart(4, "0");
@@ -240,4 +287,5 @@ btnScan.addEventListener("click", handleScan);
 document.addEventListener("DOMContentLoaded", () => {
     log("LinTab GUI iniciando…");
     refreshStatus();
+    setInterval(refreshPrecision, 150);
 });

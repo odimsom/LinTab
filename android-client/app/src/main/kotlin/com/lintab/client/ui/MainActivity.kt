@@ -5,6 +5,7 @@ package com.lintab.client.ui
 
 import android.animation.ObjectAnimator
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
@@ -25,11 +26,9 @@ class MainActivity : AppCompatActivity() {
     private var screenWidth  = 0
     private var screenHeight = 0
 
-    // Auto-hide HUD 2 s after last touch
     private val hudHideDelay = 2_000L
     private val hideHudTask  = Runnable { fadeHud(visible = false) }
 
-    // Runnable pendiente de onDaemonConnected — se cancela si desconecta antes de disparar
     private val hideOverlayTask = Runnable {
         binding.overlayIdle.animate().alpha(0f).setDuration(500).withEndAction {
             binding.overlayIdle.visibility = View.GONE
@@ -39,7 +38,6 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Full-screen immersive (UI disappears while drawing)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         WindowInsetsControllerCompat(window, window.decorView).apply {
             hide(WindowInsetsCompat.Type.systemBars())
@@ -51,12 +49,10 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Cache display resolution for coordinate mapping
         val dm      = resources.displayMetrics
         screenWidth = dm.widthPixels
         screenHeight= dm.heightPixels
 
-        // Connection setup
         connection = DaemonConnection(this).apply {
             onConnected    = { host -> runOnUiThread { onDaemonConnected(host) } }
             onDisconnected = {        runOnUiThread { onDaemonDisconnected()  } }
@@ -81,9 +77,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun onDaemonDisconnected() {
-        // Cancela cualquier fade-out pendiente antes de restaurar el overlay
         binding.overlayIdle.removeCallbacks(hideOverlayTask)
         binding.overlayIdle.animate().cancel()
+        binding.trailView.clear()
         showIdle()
         binding.tvIdleLabel.text = "01. BUSCANDO HOST..."
     }
@@ -100,19 +96,25 @@ class MainActivity : AppCompatActivity() {
         val proto = StylusCapture.motionEventToProto(event, screenWidth, screenHeight)
             ?: return false
 
+        // Trail effect — add point for every move/down event
+        if (event.actionMasked != MotionEvent.ACTION_UP &&
+            event.actionMasked != MotionEvent.ACTION_CANCEL) {
+            binding.trailView.addPoint(event.x, event.y)
+        }
+
         // Show HUD while drawing, schedule auto-hide
         fadeHud(visible = true)
         binding.tvHud.removeCallbacks(hideHudTask)
         binding.tvHud.postDelayed(hideHudTask, hudHideDelay)
 
-        // Update HUD diagnostic overlay
         val pressure  = (event.pressure * 8191f).roundToInt().coerceIn(0, 8191)
         val tilt      = Math.toDegrees(event.getAxisValue(MotionEvent.AXIS_TILT).toDouble())
             .roundToInt()
-        val latencyMs = ((System.nanoTime() / 1_000_000L) - event.eventTime).coerceAtLeast(0L)
+        // Use SystemClock.uptimeMillis() which matches event.eventTime (same clock)
+        val latencyMs = (SystemClock.uptimeMillis() - event.eventTime).coerceAtLeast(0L)
         binding.tvHud.text =
             "P: ${pressure.toString().padStart(4, '0')} | T: ${
-                if (tilt >= 0) "+" else ""}${tilt}° | L: ${latencyMs}.${latencyMs % 10}ms"
+                if (tilt >= 0) "+" else ""}${tilt}° | L: ${latencyMs}ms"
 
         connection.send(proto)
         return true

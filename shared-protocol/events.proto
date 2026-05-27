@@ -10,21 +10,28 @@ option java_outer_classname = "EventsProto";
 
 // Single stylus/touch sample captured by the Android client.
 message TabletEvent {
-  int32    x            = 1;  // raw touch X in pixels
-  int32    y            = 2;  // raw touch Y in pixels
-  int32    pressure     = 3;  // [0 – 8191]
-  int32    tilt_x       = 4;  // degrees [-90 – 90]
-  int32    tilt_y       = 5;  // degrees [-90 – 90]
-  ToolType tool         = 6;
-  int64    timestamp_us = 7;  // device uptime at event time
-  int32    screen_width = 8;  // Android display width  in px (for coord mapping)
-  int32    screen_height= 9;  // Android display height in px (for coord mapping)
+  int32      x            = 1;  // raw touch X in pixels
+  int32      y            = 2;  // raw touch Y in pixels
+  int32      pressure     = 3;  // [0 – 8191]
+  int32      tilt_x       = 4;  // degrees [-90 – 90]
+  int32      tilt_y       = 5;  // degrees [-90 – 90]
+  ToolType   tool         = 6;
+  int64      timestamp_us = 7;  // device uptime at event time
+  int32      screen_width = 8;  // Android display width  in px (for coord mapping)
+  int32      screen_height= 9;  // Android display height in px (for coord mapping)
+  ActionType action       = 10; // DOWN / MOVE / UP — used to emit BTN_TOOL_PEN correctly
 }
 
 enum ToolType {
   TOOL_FINGER = 0;
   TOOL_PEN    = 1;
   TOOL_ERASER = 2;
+}
+
+enum ActionType {
+  ACTION_MOVE = 0;  // default for legacy events without this field
+  ACTION_DOWN = 1;
+  ACTION_UP   = 2;
 }
 
 // Framed stream: each message is length-prefixed (4-byte big-endian uint32).

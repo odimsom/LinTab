@@ -4,6 +4,7 @@
 package com.lintab.client.capture
 
 import android.view.MotionEvent
+import com.lintab.protocol.EventsProto.ActionType
 import com.lintab.protocol.EventsProto.TabletEvent
 import com.lintab.protocol.EventsProto.ToolType
 
@@ -11,15 +12,6 @@ object StylusCapture {
 
     private const val MAX_PRESSURE = 8191
 
-    /**
-     * Converts an Android [MotionEvent] into a protobuf [TabletEvent].
-     *
-     * Raw pixel coordinates are sent together with the screen dimensions so
-     * the Linux daemon can apply the exact mapping:
-     *   X_linux = (X_android / screen_width) * 32767
-     *
-     * Returns null for non-stylus/non-touch events.
-     */
     fun motionEventToProto(
         event: MotionEvent,
         screenWidth: Int,
@@ -30,6 +22,15 @@ object StylusCapture {
             MotionEvent.TOOL_TYPE_ERASER  -> ToolType.TOOL_ERASER
             MotionEvent.TOOL_TYPE_FINGER  -> ToolType.TOOL_FINGER
             else -> return null
+        }
+
+        val action = when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN,
+            MotionEvent.ACTION_POINTER_DOWN -> ActionType.ACTION_DOWN
+            MotionEvent.ACTION_UP,
+            MotionEvent.ACTION_POINTER_UP,
+            MotionEvent.ACTION_CANCEL       -> ActionType.ACTION_UP
+            else                            -> ActionType.ACTION_MOVE
         }
 
         val pressure = (event.pressure * MAX_PRESSURE)
@@ -47,10 +48,11 @@ object StylusCapture {
         return TabletEvent.newBuilder()
             .setX(event.x.toInt())
             .setY(event.y.toInt())
-            .setPressure(pressure)
+            .setPressure(if (action == ActionType.ACTION_UP) 0 else pressure)
             .setTiltX(tiltDeg)
             .setTiltY(orientDeg)
             .setTool(toolType)
+            .setAction(action)
             .setTimestampUs(event.eventTime * 1_000L)
             .setScreenWidth(screenWidth)
             .setScreenHeight(screenHeight)

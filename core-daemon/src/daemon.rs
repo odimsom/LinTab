@@ -14,7 +14,7 @@
 use crate::{
     ipc::{socket_path, IpcCommand, IpcResponse},
     scan, setup, transport,
-    transport::SharedMapping,
+    transport::{SharedLastEvent, SharedMapping},
     uinput,
 };
 use anyhow::Result;
@@ -49,12 +49,14 @@ pub async fn run() -> Result<()> {
     tokio::spawn(setup::watch_adb_devices());
 
     // ── 5. TCP transport loop ─────────────────────────────────────────────────
-    let mapping: SharedMapping = transport::new_shared_mapping();
+    let mapping:    SharedMapping   = transport::new_shared_mapping();
+    let last_event: SharedLastEvent = transport::new_shared_last_event();
     {
         let dev = Arc::clone(&device);
         let map = Arc::clone(&mapping);
+        let evt = Arc::clone(&last_event);
         tokio::spawn(async move {
-            if let Err(e) = transport::serve_loop(dev, map).await {
+            if let Err(e) = transport::serve_loop(dev, map, evt).await {
                 error!("Error en el transporte: {e:#}");
             }
         });
@@ -76,7 +78,8 @@ pub async fn run() -> Result<()> {
             Ok((stream, _)) => {
                 let dev = Arc::clone(&device);
                 let map = Arc::clone(&mapping);
-                tokio::spawn(handle_client(stream, dev, map));
+                let evt = Arc::clone(&last_event);
+                tokio::spawn(handle_client(stream, dev, map, evt));
             }
             Err(e) => error!("Error en socket IPC: {e:#}"),
         }
@@ -86,16 +89,17 @@ pub async fn run() -> Result<()> {
 // ── Per-client IPC handler ────────────────────────────────────────────────────
 
 async fn handle_client(
-    stream: UnixStream,
-    device: Arc<Mutex<uinput::TabletDevice>>,
-    mapping: SharedMapping,
+    stream:     UnixStream,
+    device:     Arc<Mutex<uinput::TabletDevice>>,
+    mapping:    SharedMapping,
+    last_event: SharedLastEvent,
 ) {
     let (reader_half, mut writer) = stream.into_split();
     let mut lines = BufReader::new(reader_half).lines();
 
     while let Ok(Some(line)) = lines.next_line().await {
         let response = match serde_json::from_str::<IpcCommand>(&line) {
-            Ok(cmd) => dispatch(cmd, &device, &mapping).await,
+            Ok(cmd) => dispatch(cmd, &device, &mapping, &last_event).await,
             Err(e)  => IpcResponse::err(format!("parse error: {e}")),
         };
 
@@ -108,15 +112,17 @@ async fn handle_client(
 // ── Command dispatcher ────────────────────────────────────────────────────────
 
 async fn dispatch(
-    cmd: IpcCommand,
-    _device: &Arc<Mutex<uinput::TabletDevice>>,
-    mapping: &SharedMapping,
+    cmd:        IpcCommand,
+    _device:    &Arc<Mutex<uinput::TabletDevice>>,
+    mapping:    &SharedMapping,
+    last_event: &SharedLastEvent,
 ) -> IpcResponse {
     match cmd {
         IpcCommand::Status => IpcResponse::ok(serde_json::json!({
             "running": true,
             "version": env!("CARGO_PKG_VERSION"),
             "port": setup::TABLET_PORT,
+            "relative_mode": mapping.read().await.relative_mode,
         })),
 
         IpcCommand::Scan => {
@@ -143,7 +149,6 @@ async fn dispatch(
                 (_, Some(raw)) => raw,
                 _ => return IpcResponse::err("Especifica --ip o --dname"),
             };
-            // Transport loop is already listening; Android side initiates connection
             IpcResponse::ok(serde_json::json!({
                 "message": format!("Esperando conexión de {target}:{}", setup::TABLET_PORT)
             }))
@@ -153,14 +158,26 @@ async fn dispatch(
             IpcResponse::ok(serde_json::json!({"disconnected": true}))
         }
 
-        IpcCommand::SetMapping { screen_x, screen_y, screen_width, screen_height, rotation } => {
+        IpcCommand::SetMapping { screen_x, screen_y, screen_width, screen_height, rotation, relative_mode } => {
             let mut map = mapping.write().await;
             map.monitor_width  = screen_width;
             map.monitor_height = screen_height;
+            map.rotation       = rotation;
+            map.relative_mode  = relative_mode;
             IpcResponse::ok(serde_json::json!({
                 "mapping": {"x": screen_x, "y": screen_y,
                             "w": screen_width, "h": screen_height,
-                            "rotation": rotation}
+                            "rotation": rotation,
+                            "relative_mode": relative_mode}
+            }))
+        }
+
+        IpcCommand::GetPrecision => {
+            let snap = last_event.read().await.clone().unwrap_or_default();
+            IpcResponse::ok(serde_json::json!({
+                "pressure": snap.pressure,
+                "tilt_x":   snap.tilt_x,
+                "tilt_y":   snap.tilt_y,
             }))
         }
     }

@@ -1,8 +1,7 @@
 // Copyright (c) 2026 Francisco Daniel Castro Borrome. Todos los derechos reservados.
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//! Tauri commands — each function is the bridge between the TypeScript
-//! frontend and the running lintab daemon via the Unix IPC socket.
+//! Tauri commands — bridge between the TypeScript frontend and the lintab daemon.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -31,12 +30,14 @@ enum IpcCommand<'a> {
     },
     Disconnect,
     SetMapping {
-        screen_x: u32,
-        screen_y: u32,
-        screen_width: u32,
+        screen_x:      u32,
+        screen_y:      u32,
+        screen_width:  u32,
         screen_height: u32,
-        rotation: u32,
+        rotation:      u32,
+        relative_mode: bool,
     },
+    GetPrecision,
 }
 
 #[derive(Deserialize)]
@@ -46,10 +47,31 @@ struct IpcResponse {
     error: Option<String>,
 }
 
+/// Try to connect to the daemon socket; if it's not running, auto-start it.
+async fn ensure_daemon() -> Result<(), String> {
+    if socket_path().exists() { return Ok(()); }
+
+    // Attempt to launch the daemon in the background
+    let _ = tokio::process::Command::new("lintab")
+        .arg("daemon")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn();
+
+    // Wait up to 2 s for the socket to appear
+    for _ in 0..20 {
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        if socket_path().exists() { return Ok(()); }
+    }
+    Err("El daemon no pudo iniciarse. Ejecuta: lintab setup --auto".into())
+}
+
 async fn call_daemon(cmd: &IpcCommand<'_>) -> Result<Value, String> {
+    ensure_daemon().await?;
+
     let mut stream = UnixStream::connect(socket_path())
         .await
-        .map_err(|_| "Daemon is not running. Launch `lintab` first.".to_string())?;
+        .map_err(|_| "Daemon no responde. Ejecuta: lintab".to_string())?;
 
     let mut payload = serde_json::to_string(cmd).map_err(|e| e.to_string())?;
     payload.push('\n');
@@ -96,12 +118,20 @@ pub async fn disconnect_device() -> Result<Value, String> {
 
 #[tauri::command]
 pub async fn set_tablet_mapping(
-    screen_x: u32,
-    screen_y: u32,
-    screen_width: u32,
+    screen_x:      u32,
+    screen_y:      u32,
+    screen_width:  u32,
     screen_height: u32,
-    rotation: u32,
+    rotation:      u32,
+    relative_mode: bool,
 ) -> Result<Value, String> {
-    call_daemon(&IpcCommand::SetMapping { screen_x, screen_y, screen_width, screen_height, rotation })
-        .await
+    call_daemon(&IpcCommand::SetMapping {
+        screen_x, screen_y, screen_width, screen_height, rotation, relative_mode,
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn get_precision() -> Result<Value, String> {
+    call_daemon(&IpcCommand::GetPrecision).await
 }

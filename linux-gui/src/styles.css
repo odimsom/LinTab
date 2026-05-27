@@ -290,6 +290,21 @@ body {
 .rot-btn:hover,
 .rot-btn.selected { border-color: var(--orange); color: var(--orange); }
 
+.mode-btn {
+  background: transparent;
+  border: var(--border-line);
+  padding: 0.3rem 0.7rem;
+  font-family: var(--f-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  border-radius: 0;
+  transition: border-color 0.1s, color 0.1s;
+  color: var(--muted);
+  cursor: pointer;
+}
+.mode-btn:hover,
+.mode-btn.selected { border-color: var(--orange); color: var(--orange); }
+
 /* ── 04 Console ──────────────────────────────────────────────────────────── */
 .console-log {
   flex: 1;

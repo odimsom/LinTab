@@ -12,6 +12,7 @@ pub fn run() {
             commands::connect_device,
             commands::disconnect_device,
             commands::set_tablet_mapping,
+            commands::get_precision,
         ])
         .run(tauri::generate_context!())
         .expect("error while running LinTab GUI");
