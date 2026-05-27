@@ -3,6 +3,7 @@
 
 use anyhow::{Context, Result};
 use serde::Serialize;
+use std::path::PathBuf;
 use tokio::process::Command;
 
 #[derive(Serialize)]
@@ -11,10 +12,64 @@ pub struct AdbDevice {
     pub state: String,
 }
 
+/// Locate the `adb` binary regardless of how the process was launched.
+///
+/// systemd user services inherit a minimal PATH that typically omits Android
+/// SDK directories, so we probe environment variables and common install paths
+/// before falling back to a PATH walk.
+pub fn find_adb() -> Option<PathBuf> {
+    // Env vars set by Android Studio / sdkmanager
+    for var in &["ANDROID_HOME", "ANDROID_SDK_ROOT"] {
+        if let Ok(root) = std::env::var(var) {
+            let p = PathBuf::from(root).join("platform-tools/adb");
+            if p.is_file() {
+                return Some(p);
+            }
+        }
+    }
+
+    // Common fixed install locations
+    let home = std::env::var("HOME").unwrap_or_default();
+    let candidates = [
+        format!("{home}/Android/Sdk/platform-tools/adb"), // Android Studio default
+        format!("{home}/.local/lib/android-sdk/platform-tools/adb"),
+        "/opt/android-sdk/platform-tools/adb".into(),
+        "/usr/lib/android-sdk/platform-tools/adb".into(),
+        "/usr/bin/adb".into(),
+        "/usr/local/bin/adb".into(),
+    ];
+    for path in &candidates {
+        let p = PathBuf::from(path);
+        if p.is_file() {
+            return Some(p);
+        }
+    }
+
+    // Fall back to PATH resolution
+    if let Ok(path_var) = std::env::var("PATH") {
+        for dir in path_var.split(':') {
+            let p = PathBuf::from(dir).join("adb");
+            if p.is_file() {
+                return Some(p);
+            }
+        }
+    }
+
+    None
+}
+
 /// List USB-connected Android devices by calling `adb devices`.
 /// Returns an empty vec (not an error) if `adb` is not installed.
 pub async fn list_devices() -> Result<Vec<AdbDevice>> {
-    let output = match Command::new("adb").arg("devices").output().await {
+    let adb = match find_adb() {
+        Some(p) => p,
+        None => {
+            tracing::warn!("`adb` not found – skipping USB scan");
+            return Ok(vec![]);
+        }
+    };
+
+    let output = match Command::new(&adb).arg("devices").output().await {
         Ok(o) => o,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             tracing::warn!("`adb` not found in PATH – skipping USB scan");

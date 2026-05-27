@@ -9,6 +9,8 @@ use std::collections::HashSet;
 use tokio::process::Command;
 use tracing::{info, warn};
 
+use crate::scan::adb::find_adb;
+
 const UDEV_RULE: &str = r#"KERNEL=="uinput", GROUP="input", MODE="0660""#;
 const UDEV_RULE_PATH: &str = "/etc/udev/rules.d/99-lintab.rules";
 pub const TABLET_PORT: u16 = 7654;
@@ -29,9 +31,10 @@ pub fn udev_rule_exists() -> bool {
         || std::path::Path::new("/etc/udev/rules.d/99-uinput.rules").exists()
 }
 
-/// Returns true if `adb` is on PATH.
+/// Returns true if `adb` is reachable (PATH or common install locations).
 pub async fn adb_available() -> bool {
-    Command::new("adb")
+    let Some(adb) = find_adb() else { return false };
+    Command::new(adb)
         .arg("version")
         .output()
         .await
@@ -118,9 +121,10 @@ pub async fn watch_adb_devices() {
     loop {
         tokio::time::sleep(std::time::Duration::from_secs(3)).await;
 
-        let output = match Command::new("adb").arg("devices").output().await {
+        let Some(adb) = find_adb() else { continue };
+        let output = match Command::new(&adb).arg("devices").output().await {
             Ok(o) => o,
-            Err(_) => continue, // adb not installed — silently skip
+            Err(_) => continue,
         };
 
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -137,7 +141,7 @@ pub async fn watch_adb_devices() {
 
         for serial in current.difference(&known) {
             info!("Dispositivo USB detectado ({serial}) — activando túnel ADB…");
-            let ok = Command::new("adb")
+            let ok = Command::new(&adb)
                 .args(["-s", serial, "reverse", &format!("tcp:{TABLET_PORT}"), &format!("tcp:{TABLET_PORT}")])
                 .status()
                 .await
