@@ -84,14 +84,14 @@ function showSetupGuide(): void {
   setupMsg.innerHTML = `
     <div style="
       background: #1a1a1a;
-      border: 2px solid #2196F3;
+      border: 2px solid #FF4F00;
       border-radius: 8px;
       padding: 2rem;
       max-width: 700px;
       text-align: left;
       line-height: 1.6;
     ">
-      <h2 style="color: #2196F3; margin-top: 0; font-size: 1.5rem;">
+      <h2 style="color: #FF4F00; margin-top: 0; font-size: 1.5rem;">
         ⚠️ CONFIGURACIÓN INICIAL REQUERIDA
       </h2>
       
@@ -135,7 +135,7 @@ function showSetupGuide(): void {
       </p>
       
       <button id="close-setup" style="
-        background: #2196F3;
+        background: #FF4F00;
         color: white;
         border: none;
         padding: 0.8rem 1.5rem;
@@ -204,7 +204,7 @@ async function connectDevice(addr: string, type: string): Promise<void> {
   log(`Iniciando vínculo con ${addr} (${type})…`);
   try {
     const result = await invoke("connect_device", {
-      ip: type.startsWith("ADB") ? undefined : addr,
+      ip:    type.startsWith("ADB") ? "127.0.0.1" : addr,
       dname: undefined,
     });
     log(`VÍNCULO ESTABLECIDO — ${JSON.stringify(result)}`, "ok");

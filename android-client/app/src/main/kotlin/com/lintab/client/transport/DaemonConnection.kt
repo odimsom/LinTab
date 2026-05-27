@@ -42,9 +42,15 @@ class DaemonConnection(private val context: Context) {
 
     private suspend fun runConnectionLoop() {
         while (true) {
-            val host = resolveHost() ?: run {
+            val host = try {
+                resolveHost()
+            } catch (_: Exception) {
+                // NSD puede lanzar SecurityException si falta NEARBY_WIFI_DEVICES
+                delay(3_000)
+                null
+            } ?: run {
                 delay(2_000)
-                return@run null
+                null
             } ?: continue
 
             try {

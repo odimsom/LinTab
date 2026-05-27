@@ -29,6 +29,13 @@ class MainActivity : AppCompatActivity() {
     private val hudHideDelay = 2_000L
     private val hideHudTask  = Runnable { fadeHud(visible = false) }
 
+    // Runnable pendiente de onDaemonConnected — se cancela si desconecta antes de disparar
+    private val hideOverlayTask = Runnable {
+        binding.overlayIdle.animate().alpha(0f).setDuration(500).withEndAction {
+            binding.overlayIdle.visibility = View.GONE
+        }.start()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -69,14 +76,14 @@ class MainActivity : AppCompatActivity() {
 
     private fun onDaemonConnected(host: String) {
         binding.tvIdleLabel.text = "LISTO PARA CREAR. DESLIZA EL STYLUS."
-        binding.tvIdleLabel.postDelayed({
-            binding.overlayIdle.animate().alpha(0f).setDuration(500).withEndAction {
-                binding.overlayIdle.visibility = View.GONE
-            }.start()
-        }, 1_200)
+        binding.overlayIdle.removeCallbacks(hideOverlayTask)
+        binding.overlayIdle.postDelayed(hideOverlayTask, 1_200)
     }
 
     private fun onDaemonDisconnected() {
+        // Cancela cualquier fade-out pendiente antes de restaurar el overlay
+        binding.overlayIdle.removeCallbacks(hideOverlayTask)
+        binding.overlayIdle.animate().cancel()
         showIdle()
         binding.tvIdleLabel.text = "01. BUSCANDO HOST..."
     }
