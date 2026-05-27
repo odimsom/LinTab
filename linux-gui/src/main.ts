@@ -55,9 +55,104 @@ async function refreshStatus(): Promise<void> {
     socketEl.textContent = "$XDG_RUNTIME_DIR/lintab.sock";
     log(`Daemon v${data.version} — activo`, "ok");
   } catch {
-    statusEl.textContent = "DAEMON INACTIVO";
+    statusEl.textContent = "SETUP REQUERIDO";
     statusEl.classList.remove("active");
-    log("ERROR 04: SOCKET NO ENCONTRADO. VERIFICA PERMISOS UDEV.", "error");
+    log("ERROR 04: SOCKET NO ENCONTRADO. REQUIERE CONFIGURACIÓN INICIAL.", "error");
+    showSetupGuide();
+  }
+}
+
+function showSetupGuide(): void {
+  const setupMsg = document.createElement("div");
+  setupMsg.id = "setup-guide";
+  setupMsg.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.9);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    color: #fff;
+    padding: 2rem;
+  `;
+  
+  setupMsg.innerHTML = `
+    <div style="
+      background: #1a1a1a;
+      border: 2px solid #2196F3;
+      border-radius: 8px;
+      padding: 2rem;
+      max-width: 700px;
+      text-align: left;
+      line-height: 1.6;
+    ">
+      <h2 style="color: #2196F3; margin-top: 0; font-size: 1.5rem;">
+        ⚠️ CONFIGURACIÓN INICIAL REQUERIDA
+      </h2>
+      
+      <p style="color: #aaa; margin: 1rem 0;">
+        LinTab necesita permiso para acceder a <code style="background:#0a0a0a;padding:0.2rem 0.4rem;">/dev/uinput</code>.
+        Ejecuta una sola vez en tu terminal:
+      </p>
+      
+      <div style="
+        background: #0a0a0a;
+        border: 1px solid #333;
+        border-radius: 4px;
+        padding: 1rem;
+        margin: 1.5rem 0;
+        overflow-x: auto;
+      ">
+        <code style="color: #4ec9b0;">lintab setup --auto</code>
+      </div>
+      
+      <p style="color: #aaa; margin: 1rem 0;">
+        O manualmente (para máyor control):
+      </p>
+      
+      <div style="
+        background: #0a0a0a;
+        border: 1px solid #333;
+        border-radius: 4px;
+        padding: 1rem;
+        margin: 1.5rem 0;
+        font-size: 0.9rem;
+        overflow-x: auto;
+      ">
+        <code style="color: #4ec9b0; display: block; margin-bottom: 0.5rem;">sudo usermod -aG input \\$USER</code>
+        <code style="color: #4ec9b0; display: block; margin-bottom: 0.5rem;">echo 'KERNEL=="uinput", GROUP="input", MODE="0660"' | \\</code>
+        <code style="color: #4ec9b0; display: block; margin-bottom: 0.5rem;">&nbsp;&nbsp;&nbsp;&nbsp;sudo tee /etc/udev/rules.d/99-lintab.rules</code>
+        <code style="color: #4ec9b0; display: block;">sudo udevadm control --reload-rules && sudo udevadm trigger</code>
+      </div>
+      
+      <p style="color: #ffb74d; margin: 1rem 0;">
+        Después <strong>cierra sesión y vuelve a entrar</strong>.
+      </p>
+      
+      <button id="close-setup" style="
+        background: #2196F3;
+        color: white;
+        border: none;
+        padding: 0.8rem 1.5rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-family: 'JetBrains Mono', monospace;
+        font-weight: bold;
+        margin-top: 1rem;
+      ">ENTENDIDO</button>
+    </div>
+  `;
+  
+  if (!document.getElementById("setup-guide")) {
+    document.body.appendChild(setupMsg);
+    document.getElementById("close-setup")?.addEventListener("click", () => {
+      setupMsg.remove();
+    });
   }
 }
 

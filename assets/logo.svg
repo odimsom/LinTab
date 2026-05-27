@@ -1,0 +1,28 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background: Obsidian -->
+  <rect width="512" height="512" fill="#121212"/>
+
+  <!-- Tablet outline: centered 332x248 -->
+  <rect x="90" y="108" width="332" height="248" stroke="#FF4F00" stroke-width="14" fill="none"/>
+
+  <!-- Coordinate grid (subtle horizontal reference lines inside tablet) -->
+  <line x1="104" y1="191" x2="408" y2="191" stroke="#FF4F00" stroke-width="1.5" stroke-opacity="0.18"/>
+  <line x1="104" y1="274" x2="408" y2="274" stroke="#FF4F00" stroke-width="1.5" stroke-opacity="0.18"/>
+
+  <!-- Stylus shaft: enters from top-right, touches inside tablet -->
+  <line x1="462" y1="46" x2="316" y2="192" stroke="#FF4F00" stroke-width="20" stroke-linecap="square"/>
+
+  <!-- Stylus nib (touch point): paper-white dot -->
+  <circle cx="316" cy="192" r="10" fill="#F4F1EA"/>
+
+  <!-- "L" letterform — path-based, no font dependency -->
+  <path d="M 156 288 L 156 352 L 216 352"
+        stroke="#F4F1EA" stroke-width="22" stroke-linecap="square" stroke-linejoin="miter" fill="none"/>
+
+  <!-- "T" letterform — path-based, no font dependency -->
+  <path d="M 248 288 L 360 288 M 304 288 L 304 352"
+        stroke="#F4F1EA" stroke-width="22" stroke-linecap="square" stroke-linejoin="miter" fill="none"/>
+
+  <!-- Signal indicator: solid orange block in bottom-right corner of tablet -->
+  <rect x="400" y="340" width="22" height="16" fill="#FF4F00"/>
+</svg>

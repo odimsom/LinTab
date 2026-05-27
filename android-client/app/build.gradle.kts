@@ -9,20 +9,30 @@ plugins {
 
 android {
     namespace = "com.lintab.client"
-    compileSdk = 35
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.lintab.client"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 34
         versionCode = 1
         versionName = "0.1.0"
+    }
+
+    signingConfigs {
+        create("release") {
+            storeFile = file("../keystore/lintab-release.jks")
+            storePassword = "lintab2026"
+            keyAlias = "lintab"
+            keyPassword = "lintab2026"
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
