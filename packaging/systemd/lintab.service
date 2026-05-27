@@ -1,0 +1,13 @@
+[Unit]
+Description=LinTab – Virtual uinput tablet daemon
+Documentation=https://github.com/odimsom/LinTab
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/lintab
+Restart=on-failure
+RestartSec=5
+Environment=LINTAB_LOG=lintab=info
+
+[Install]
+WantedBy=default.target

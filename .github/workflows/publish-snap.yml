@@ -1,0 +1,45 @@
+name: Publish to Snap Store
+
+on:
+  workflow_run:
+    workflows: ["Build & Release Packages"]
+    types: [completed]
+
+# ── Secrets required ───────────────────────────────────────────────────────────
+# SNAPCRAFT_STORE_CREDENTIALS — exported with:
+#   snapcraft export-credentials --snaps=lintab --channels=stable credentials.txt
+#   cat credentials.txt   ← paste this as the secret value
+#
+# Add at: Settings → Secrets → Actions → New repository secret
+
+jobs:
+  publish:
+    name: Build & publish Snap
+    runs-on: ubuntu-22.04
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      # ── Patch version in snapcraft.yaml ──────────────────────────────────────
+      - name: Set Snap version
+        run: |
+          TAG=$(git describe --tags --exact-match HEAD 2>/dev/null || \
+                git -c protocol.file.allow=always ls-remote --tags origin \
+                | grep "${{ github.event.workflow_run.head_sha }}" \
+                | sed 's|.*refs/tags/||' | head -1)
+          VERSION="${TAG#v}"
+          sed -i "s/^version:.*/version: \"${VERSION}\"/" packaging/snap/snapcraft.yaml
+
+      # ── Copy snapcraft.yaml to project root (snapcraft convention) ────────────
+      - name: Prepare Snap workspace
+        run: cp packaging/snap/snapcraft.yaml snapcraft.yaml
+
+      # ── Build and publish ─────────────────────────────────────────────────────
+      - uses: snapcore/action-publish@v1
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        with:
+          snap-channel: stable

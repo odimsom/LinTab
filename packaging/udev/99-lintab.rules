@@ -1,0 +1,5 @@
+# LinTab — udev rule for /dev/uinput access
+# Allows members of the 'input' group to create virtual input devices.
+# Install: sudo cp 99-lintab.rules /etc/udev/rules.d/
+#          sudo udevadm control --reload-rules && sudo udevadm trigger
+KERNEL=="uinput", GROUP="input", MODE="0660"

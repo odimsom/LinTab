@@ -1,0 +1,18 @@
+pkgbase = lintab
+	pkgdesc = Transform any Android device into an ultra-low-latency graphics tablet for Linux (uinput)
+	pkgver = 0.3.0
+	pkgrel = 1
+	url = https://github.com/odimsom/LinTab
+	arch = x86_64
+	arch = aarch64
+	license = GPL-3.0-or-later
+	makedepends = rust
+	makedepends = cargo
+	makedepends = protobuf
+	depends = glibc
+	depends = udev
+	optdepends = android-tools: USB/ADB connection support
+	source = lintab-0.3.0.tar.gz::https://github.com/odimsom/LinTab/archive/v0.3.0.tar.gz
+	sha256sums = SKIP
+
+pkgname = lintab

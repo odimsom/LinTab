@@ -1,0 +1,94 @@
+name: Publish to AUR
+
+# Runs after build-packages succeeds, so the tarball SHA exists on the release.
+on:
+  workflow_run:
+    workflows: ["Build & Release Packages"]
+    types: [completed]
+    branches-ignore: []   # run for any tag
+
+# ── Secrets required ───────────────────────────────────────────────────────────
+# AUR_SSH_KEY  — private SSH key of the AUR account that owns the package.
+#                Add it at: Settings → Secrets → Actions → New repository secret.
+#                The corresponding public key must be in your AUR account settings.
+
+jobs:
+  publish:
+    name: Update AUR package
+    runs-on: ubuntu-22.04
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ── Resolve tag and version ──────────────────────────────────────────────
+      - name: Get tag and version
+        id: meta
+        run: |
+          TAG="${{ github.event.workflow_run.head_branch }}"
+          # workflow_run doesn't expose the tag directly — get it from git
+          TAG=$(git -c protocol.file.allow=always ls-remote --tags origin \
+               | grep "${{ github.event.workflow_run.head_sha }}" \
+               | sed 's|.*refs/tags/||' | head -1)
+          VERSION="${TAG#v}"
+          echo "tag=${TAG}"     >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      # ── Compute SHA256 of the release tarball ────────────────────────────────
+      - name: Compute tarball SHA256
+        id: sha
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          URL="https://github.com/${{ github.repository }}/archive/${TAG}.tar.gz"
+          SHA=$(curl -fsSL "$URL" | sha256sum | cut -d' ' -f1)
+          echo "sha256=${SHA}" >> "$GITHUB_OUTPUT"
+
+      # ── Update PKGBUILD in the local tree ────────────────────────────────────
+      - name: Patch PKGBUILD
+        run: |
+          VERSION="${{ steps.meta.outputs.version }}"
+          SHA="${{ steps.sha.outputs.sha256 }}"
+          sed -i "s/^pkgver=.*/pkgver=${VERSION}/" packaging/aur/PKGBUILD
+          sed -i "s/^pkgrel=.*/pkgrel=1/"          packaging/aur/PKGBUILD
+          sed -i "s/^b2sums=.*/sha256sums=('${SHA}')/" packaging/aur/PKGBUILD
+
+      # ── Generate .SRCINFO ─────────────────────────────────────────────────────
+      - name: Install makepkg + generate .SRCINFO
+        run: |
+          sudo apt-get install -y libarchive-tools
+          # makepkg is Arch-only; we use a Docker container to generate .SRCINFO
+          docker run --rm \
+            -v "${{ github.workspace }}/packaging/aur:/pkg" \
+            archlinux:latest \
+            bash -c "cd /pkg && pacman -Sy --noconfirm base-devel && \
+                     sudo -u nobody HOME=/tmp makepkg --printsrcinfo > .SRCINFO" 2>/dev/null \
+          || true
+          # Fallback: generate .SRCINFO manually if Docker is unavailable
+          if [ ! -s packaging/aur/.SRCINFO ]; then
+            python3 scripts/gen_srcinfo.py packaging/aur/PKGBUILD > packaging/aur/.SRCINFO || true
+          fi
+
+      # ── Push to AUR ───────────────────────────────────────────────────────────
+      - name: Configure SSH for AUR
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.AUR_SSH_KEY }}
+          known_hosts: |
+            aur.archlinux.org ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEuBKrPzbawxA/k2g6NcyV5jmqwJ2s+zpgZGZ7tpLZrj
+
+      - name: Clone AUR repo and push update
+        run: |
+          VERSION="${{ steps.meta.outputs.version }}"
+          git clone "ssh://aur@aur.archlinux.org/lintab.git" /tmp/aur-lintab
+          cp packaging/aur/PKGBUILD   /tmp/aur-lintab/PKGBUILD
+          cp packaging/aur/.SRCINFO   /tmp/aur-lintab/.SRCINFO
+
+          cd /tmp/aur-lintab
+          git config user.email "borrome941@gmail.com"
+          git config user.name  "Francisco Daniel Castro Borrome"
+          git add PKGBUILD .SRCINFO
+          git diff --cached --quiet && exit 0   # nothing changed
+          git commit -m "Update to v${VERSION}"
+          git push

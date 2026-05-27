@@ -1,0 +1,57 @@
+app-id: com.lintab.LinTab
+runtime: org.freedesktop.Platform
+runtime-version: '23.08'
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+  - org.freedesktop.Sdk.Extension.node20
+
+command: lintab-gui
+finish-args:
+  - --share=network
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --device=all          # uinput access
+  - --filesystem=xdg-run/lintab.sock:create
+
+modules:
+  # ── core daemon ──────────────────────────────────────────────────────────────
+  - name: lintab-daemon
+    buildsystem: simple
+    build-options:
+      append-path: /usr/lib/sdk/rust-stable/bin
+      env:
+        CARGO_HOME: /run/build/lintab-daemon/cargo-home
+        CARGO_TARGET_DIR: /run/build/lintab-daemon/target
+    build-commands:
+      - cd core-daemon && cargo build --frozen --release
+      - install -Dm755 /run/build/lintab-daemon/target/release/lintab /app/bin/lintab
+      - install -Dm644 packaging/udev/99-lintab.rules /app/share/lintab/99-lintab.rules
+    sources:
+      - type: git
+        url: https://github.com/odimsom/LinTab.git
+        tag: v0.3.0
+        commit: REPLACE_WITH_COMMIT_SHA
+
+  # ── Tauri GUI ─────────────────────────────────────────────────────────────────
+  - name: lintab-gui
+    buildsystem: simple
+    build-options:
+      append-path: /usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/node20/bin
+      env:
+        CARGO_HOME: /run/build/lintab-gui/cargo-home
+        npm_config_cache: /run/build/lintab-gui/npm-cache
+    build-commands:
+      - cd linux-gui && npm ci
+      - cd linux-gui && npm run build
+      - cd linux-gui && cargo tauri build --bundles none
+      - install -Dm755 linux-gui/src-tauri/target/release/lintab-gui /app/bin/lintab-gui
+      - install -Dm644 assets/icon-512.png /app/share/icons/hicolor/512x512/apps/com.lintab.LinTab.png
+      - install -Dm644 packaging/flatpak/com.lintab.LinTab.desktop /app/share/applications/com.lintab.LinTab.desktop
+      - install -Dm644 packaging/flatpak/com.lintab.LinTab.metainfo.xml /app/share/metainfo/com.lintab.LinTab.metainfo.xml
+    sources:
+      - type: git
+        url: https://github.com/odimsom/LinTab.git
+        tag: v0.3.0
+        commit: REPLACE_WITH_COMMIT_SHA

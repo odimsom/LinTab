@@ -1,0 +1,226 @@
+name: Build & Release Packages
+
+# Triggered by any tag that matches v*  (e.g. v0.3.0)
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write   # needed to upload assets to the GitHub release
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+# ── Jobs ───────────────────────────────────────────────────────────────────────
+
+jobs:
+
+  # ── 1. Build the daemon binary + .tar.gz ──────────────────────────────────
+  build-tarball:
+    name: Daemon tarball (x86_64)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            core-daemon/target
+          key: daemon-${{ runner.os }}-${{ hashFiles('core-daemon/Cargo.lock') }}
+
+      - name: Build release binary
+        run: |
+          cd core-daemon
+          cargo build --release --locked
+
+      - name: Package tarball
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          mkdir -p dist
+          cp core-daemon/target/release/lintab       dist/
+          cp packaging/udev/99-lintab.rules           dist/
+          cp packaging/systemd/lintab.service         dist/
+          cp INSTALL.md                               dist/
+          tar -czf "lintab-v${VERSION}-x86_64-linux.tar.gz" \
+            -C dist lintab 99-lintab.rules lintab.service INSTALL.md
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tarball
+          path: lintab-*.tar.gz
+
+  # ── 2. Debian package (.deb) ──────────────────────────────────────────────
+  build-deb:
+    name: Debian package (.deb)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            core-daemon/target
+          key: deb-${{ runner.os }}-${{ hashFiles('core-daemon/Cargo.lock') }}
+
+      - name: Install cargo-deb
+        run: cargo install cargo-deb --locked
+
+      - name: Build .deb
+        run: |
+          cd core-daemon
+          cargo deb --locked
+
+      - name: Rename artifact
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          cp core-daemon/target/debian/lintab_*.deb "lintab_${VERSION}_amd64.deb"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: debian-package
+          path: lintab_*.deb
+
+  # ── 3. RPM package (.rpm) ─────────────────────────────────────────────────
+  build-rpm:
+    name: RPM package (.rpm)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            core-daemon/target
+          key: rpm-${{ runner.os }}-${{ hashFiles('core-daemon/Cargo.lock') }}
+
+      - name: Install cargo-generate-rpm
+        run: cargo install cargo-generate-rpm --locked
+
+      - name: Build release binary
+        run: |
+          cd core-daemon
+          cargo build --release --locked
+
+      - name: Generate .rpm
+        run: |
+          cd core-daemon
+          cargo generate-rpm
+
+      - name: Rename artifact
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          cp core-daemon/target/generate-rpm/lintab-*.rpm "lintab-${VERSION}-1.x86_64.rpm"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rpm-package
+          path: lintab-*.rpm
+
+  # ── 4. Tauri GUI — AppImage + .deb ───────────────────────────────────────
+  build-gui:
+    name: GUI AppImage + .deb (Tauri)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: linux-gui/package-lock.json
+
+      - name: Cache Cargo (GUI)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            linux-gui/src-tauri/target
+          key: gui-${{ runner.os }}-${{ hashFiles('linux-gui/src-tauri/Cargo.lock') }}
+
+      - name: Install Tauri system dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev \
+            libayatana-appindicator3-dev
+
+      - name: Install frontend dependencies
+        run: |
+          cd linux-gui
+          npm ci
+
+      - name: Build frontend
+        run: |
+          cd linux-gui
+          npm run build
+
+      - name: Tauri build (AppImage + deb)
+        run: |
+          cd linux-gui
+          cargo tauri build --bundles appimage,deb
+
+      - name: Rename artifacts
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          find linux-gui/src-tauri/target/release/bundle \
+            -name "*.AppImage" -exec cp {} "LinTab_${VERSION}_amd64.AppImage" \;
+          find linux-gui/src-tauri/target/release/bundle \
+            -name "*.deb" -exec cp {} "lintab-gui_${VERSION}_amd64.deb" \;
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gui-packages
+          path: |
+            LinTab_*.AppImage
+            lintab-gui_*.deb
+
+  # ── 5. Upload all artifacts to the GitHub Release ─────────────────────────
+  upload-release:
+    name: Upload to GitHub Release
+    needs: [build-tarball, build-deb, build-rpm, build-gui]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: List artifacts
+        run: ls -lh
+
+      - name: Upload to release
+        run: |
+          gh release upload "$GITHUB_REF_NAME" \
+            lintab-*.tar.gz \
+            lintab_*.deb \
+            lintab-*.rpm \
+            LinTab_*.AppImage \
+            lintab-gui_*.deb \
+            --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}

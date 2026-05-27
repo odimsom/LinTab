@@ -1,5 +1,18 @@
 # LinTab — Instalación
 
+## Instalar desde un gestor de paquetes
+
+| Distro | Método | Comando |
+|---|---|---|
+| Arch / Manjaro | **AUR** | `yay -S lintab` |
+| Ubuntu / Debian | **.deb** (GitHub Release) | `sudo dpkg -i lintab_*.deb` |
+| Fedora / RHEL | **Copr** | `sudo dnf copr enable odimsom/lintab && sudo dnf install lintab` |
+| Cualquier distro | **AppImage** | Descarga `LinTab_*.AppImage`, hazlo ejecutable y ábrelo |
+| Ubuntu 20.04+ | **Snap** | `sudo snap install lintab` |
+| Cualquier distro | **Flatpak** | `flatpak install flathub com.lintab.LinTab` |
+
+---
+
 LinTab convierte cualquier dispositivo Android en una tableta gráfica de ultra baja latencia para Linux. La instalación implica tres pasos: preparar Linux, instalar la app Android y conectar los dispositivos.
 
 ## Requisitos mínimos

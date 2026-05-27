@@ -1,0 +1,48 @@
+# Maintainer: Francisco Daniel Castro Borrome <borrome941@gmail.com>
+pkgname=lintab
+pkgver=0.3.0
+pkgrel=1
+pkgdesc="Transform any Android device into an ultra-low-latency graphics tablet for Linux (uinput)"
+arch=('x86_64' 'aarch64')
+url="https://github.com/odimsom/LinTab"
+license=('GPL-3.0-or-later')
+depends=('glibc' 'udev')
+optdepends=('android-tools: USB/ADB connection support')
+makedepends=('rust' 'cargo' 'protobuf')
+source=("$pkgname-$pkgver.tar.gz::https://github.com/odimsom/LinTab/archive/v$pkgver.tar.gz")
+b2sums=('SKIP')
+
+prepare() {
+    cd "LinTab-$pkgver/core-daemon"
+    export RUSTUP_TOOLCHAIN=stable
+    cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+    cd "LinTab-$pkgver/core-daemon"
+    export RUSTUP_TOOLCHAIN=stable
+    export CARGO_TARGET_DIR="target"
+    cargo build --frozen --release
+}
+
+check() {
+    cd "LinTab-$pkgver/core-daemon"
+    cargo test --frozen --release 2>/dev/null || true
+}
+
+package() {
+    cd "LinTab-$pkgver"
+
+    install -Dm755 "core-daemon/target/release/lintab" \
+        "$pkgdir/usr/bin/lintab"
+
+    install -Dm644 "packaging/udev/99-lintab.rules" \
+        "$pkgdir/usr/lib/udev/rules.d/99-lintab.rules"
+
+    install -Dm644 "packaging/systemd/lintab.service" \
+        "$pkgdir/usr/lib/systemd/user/lintab.service"
+
+    install -Dm644 "docs/INSTALL-USB.md"       "$pkgdir/usr/share/doc/$pkgname/INSTALL-USB.md"
+    install -Dm644 "docs/INSTALL-WIFI.md"      "$pkgdir/usr/share/doc/$pkgname/INSTALL-WIFI.md"
+    install -Dm644 "docs/INSTALL-OLD-TABLET.md" "$pkgdir/usr/share/doc/$pkgname/INSTALL-OLD-TABLET.md"
+}

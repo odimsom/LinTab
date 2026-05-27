@@ -1,0 +1,82 @@
+name: Publish to Fedora Copr
+
+on:
+  workflow_run:
+    workflows: ["Build & Release Packages"]
+    types: [completed]
+
+# ── Secrets required ───────────────────────────────────────────────────────────
+# COPR_TOKEN — API token from https://copr.fedorainfracloud.org/api/
+# COPR_USER  — Your Copr username (or organization)
+# COPR_PROJECT — Name of the Copr project (e.g. "lintab")
+#
+# Add at: Settings → Secrets → Actions → New repository secret
+
+jobs:
+  publish:
+    name: Build SRPM & submit to Copr
+    runs-on: fedora-latest
+    container: fedora:latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Install build tools
+        run: |
+          dnf install -y \
+            rust cargo \
+            protobuf-compiler \
+            rpm-build rpmdevtools \
+            copr-cli \
+            --setopt=install_weak_deps=False
+
+      - name: Resolve version
+        id: meta
+        run: |
+          TAG=$(git describe --tags --exact-match HEAD 2>/dev/null || \
+                git ls-remote --tags origin \
+                | grep "${{ github.event.workflow_run.head_sha }}" \
+                | sed 's|.*refs/tags/||' | head -1)
+          VERSION="${TAG#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}"         >> "$GITHUB_OUTPUT"
+
+      - name: Prepare RPM tree
+        run: |
+          rpmdev-setuptree
+          VERSION="${{ steps.meta.outputs.version }}"
+          # Inject version into spec
+          sed "s/%{version}/${VERSION}/g" packaging/fedora/lintab.spec \
+            > ~/rpmbuild/SPECS/lintab.spec
+          # Download source tarball
+          curl -fsSL \
+            "https://github.com/${{ github.repository }}/archive/${{ steps.meta.outputs.tag }}.tar.gz" \
+            -o ~/rpmbuild/SOURCES/LinTab-${VERSION}.tar.gz
+
+      - name: Build SRPM
+        run: |
+          VERSION="${{ steps.meta.outputs.version }}"
+          rpmbuild -bs ~/rpmbuild/SPECS/lintab.spec \
+            --define "version ${VERSION}"
+          SRPM=$(ls ~/rpmbuild/SRPMS/lintab-*.src.rpm | head -1)
+          echo "srpm=${SRPM}" >> "$GITHUB_ENV"
+
+      - name: Configure Copr credentials
+        run: |
+          mkdir -p ~/.config
+          cat > ~/.config/copr <<EOF
+          [copr-cli]
+          login     = ${{ secrets.COPR_USER }}
+          username  = ${{ secrets.COPR_USER }}
+          token     = ${{ secrets.COPR_TOKEN }}
+          copr_url  = https://copr.fedorainfracloud.org
+          EOF
+
+      - name: Submit to Copr
+        run: |
+          copr-cli build \
+            "${{ secrets.COPR_USER }}/${{ secrets.COPR_PROJECT }}" \
+            "${{ env.srpm }}"

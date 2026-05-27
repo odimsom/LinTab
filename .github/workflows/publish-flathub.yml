@@ -1,0 +1,86 @@
+name: Submit Flatpak to Flathub
+
+on:
+  workflow_run:
+    workflows: ["Build & Release Packages"]
+    types: [completed]
+
+# ── How Flathub publishing works ───────────────────────────────────────────────
+# Flathub works via pull requests to https://github.com/flathub/com.lintab.LinTab
+# (you need to create that repo first via https://github.com/flathub/flathub/issues).
+#
+# This workflow:
+# 1. Forks / clones your Flathub repo.
+# 2. Patches the manifest with the new version + commit SHA.
+# 3. Opens a pull request for the Flathub maintainers to review.
+#
+# ── Secrets required ──────────────────────────────────────────────────────────
+# FLATHUB_TOKEN — GitHub PAT with repo scope on the flathub organisation.
+#                 Create at github.com → Settings → Developer Settings → PATs.
+
+jobs:
+  submit:
+    name: Open PR on Flathub repo
+    runs-on: ubuntu-22.04
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Resolve version and commit SHA
+        id: meta
+        run: |
+          TAG=$(git describe --tags --exact-match HEAD 2>/dev/null || \
+                git ls-remote --tags origin \
+                | grep "${{ github.event.workflow_run.head_sha }}" \
+                | sed 's|.*refs/tags/||' | head -1)
+          VERSION="${TAG#v}"
+          SHA="${{ github.event.workflow_run.head_sha }}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}"         >> "$GITHUB_OUTPUT"
+          echo "sha=${SHA}"         >> "$GITHUB_OUTPUT"
+
+      - name: Clone Flathub repo
+        run: |
+          git clone \
+            "https://x-access-token:${{ secrets.FLATHUB_TOKEN }}@github.com/flathub/com.lintab.LinTab.git" \
+            /tmp/flathub-lintab
+
+      - name: Patch Flatpak manifest
+        run: |
+          VERSION="${{ steps.meta.outputs.version }}"
+          SHA="${{ steps.meta.outputs.sha }}"
+          TAG="${{ steps.meta.outputs.tag }}"
+          MANIFEST="/tmp/flathub-lintab/com.lintab.LinTab.yml"
+
+          # Update version tag and commit SHA for both modules
+          sed -i "s/tag: v[0-9].*/tag: ${TAG}/"       "$MANIFEST"
+          sed -i "s/commit: REPLACE_WITH_COMMIT_SHA/commit: ${SHA}/g" "$MANIFEST"
+
+          # Also update the local packaging copy for reference
+          cp "$MANIFEST" packaging/flatpak/com.lintab.LinTab.yml
+
+      - name: Open pull request on Flathub
+        run: |
+          VERSION="${{ steps.meta.outputs.version }}"
+          BRANCH="update-v${VERSION}"
+
+          cd /tmp/flathub-lintab
+          git config user.email "borrome941@gmail.com"
+          git config user.name  "Francisco Daniel Castro Borrome"
+          git checkout -b "$BRANCH"
+          git add com.lintab.LinTab.yml
+          git commit -m "Update to v${VERSION}"
+          git push origin "$BRANCH"
+
+          gh pr create \
+            --repo "flathub/com.lintab.LinTab" \
+            --title "Update to v${VERSION}" \
+            --body "Automated update to LinTab v${VERSION}.
+See release notes: https://github.com/${{ github.repository }}/releases/tag/v${VERSION}" \
+            --base master \
+            --head "$BRANCH"
+        env:
+          GH_TOKEN: ${{ secrets.FLATHUB_TOKEN }}

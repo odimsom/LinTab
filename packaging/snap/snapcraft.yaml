@@ -1,0 +1,50 @@
+name: lintab
+version: "0.3.0"
+summary: Android-to-Linux ultra-low-latency virtual tablet daemon
+description: |
+  LinTab transforms any Android device into a graphics tablet for Linux
+  using the kernel uinput subsystem.
+
+  Features:
+  - 8192-level stylus pressure and tilt support
+  - Absolute, relative and hybrid input modes
+  - Adaptive compensation pipeline (smoothing, prediction, delayed commit)
+  - Hardware benchmark and auto-calibration
+  - USB via ADB (lowest latency) or WiFi via mDNS
+
+  First-time setup: run 'lintab setup --auto' to configure udev permissions.
+
+grade: stable
+confinement: strict
+base: core22
+
+architectures:
+  - build-on: amd64
+
+apps:
+  lintab:
+    command: bin/lintab
+    plugs:
+      - network
+      - network-bind
+      - uinput
+      - hardware-observe
+
+parts:
+  lintab:
+    plugin: rust
+    source: https://github.com/odimsom/LinTab.git
+    source-subdir: core-daemon
+    rust-features: []
+    build-packages:
+      - libssl-dev
+      - protobuf-compiler
+    override-build: |
+      craftctl default
+      install -Dm755 ../build/target/release/lintab "$CRAFT_PART_INSTALL/bin/lintab"
+
+  udev-rules:
+    plugin: dump
+    source: packaging/udev
+    organize:
+      99-lintab.rules: etc/udev/rules.d/99-lintab.rules
