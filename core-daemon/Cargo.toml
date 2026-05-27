@@ -1,6 +1,6 @@
 [package]
 name = "lintab-core-daemon"
-version = "0.1.1"
+version = "0.3.0"
 edition = "2021"
 authors = ["Francisco Daniel Castro Borrome"]
 license = "GPL-3.0-or-later"
@@ -25,6 +25,7 @@ prost        = "0.12"
 evdev        = "0.12"
 local-ip-address = "0.6"
 gethostname  = "0.4"
+reqwest      = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 
 [build-dependencies]
 prost-build = "0.12"

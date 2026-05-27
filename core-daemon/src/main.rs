@@ -8,6 +8,7 @@ mod scan;
 mod setup;
 mod transport;
 mod uinput;
+mod updater;
 
 use anyhow::{bail, Result};
 use clap::{Parser, Subcommand};
@@ -47,6 +48,9 @@ enum Commands {
         #[arg(long)]
         auto: bool,
     },
+
+    /// Verificar si hay una nueva versión disponible en GitHub
+    CheckUpdate,
 }
 
 // ── Entry point ───────────────────────────────────────────────────────────────
@@ -64,6 +68,7 @@ async fn main() -> Result<()> {
         Some(Commands::Scan)                       => cmd_scan().await,
         Some(Commands::Connect { dname, ip })      => cmd_connect(dname, ip).await,
         Some(Commands::Setup { auto: run_auto })   => cmd_setup(run_auto).await,
+        Some(Commands::CheckUpdate)                => cmd_check_update().await,
     }
 }
 
@@ -154,6 +159,30 @@ async fn cmd_setup(run_auto: bool) -> Result<()> {
         println!("Tip: ejecuta `lintab setup --auto` para configurar automáticamente.");
     }
 
+    Ok(())
+}
+
+async fn cmd_check_update() -> Result<()> {
+    // Try running daemon first (avoid duplicate network requests)
+    if let Ok(resp) = ipc::send_ipc_command(&ipc::IpcCommand::CheckUpdate).await {
+        print_response(resp);
+        return Ok(());
+    }
+
+    println!("Verificando actualizaciones en GitHub…");
+    let info = updater::check().await?;
+
+    if info.update_available {
+        println!("✓ Nueva versión disponible: v{}", info.latest);
+        println!("  Actual : v{}", info.current);
+        println!("  Descarga: {}", info.url);
+        if let Some(notes) = &info.changelog {
+            let preview: String = notes.lines().take(5).collect::<Vec<_>>().join("\n  ");
+            println!("  Cambios:\n  {preview}");
+        }
+    } else {
+        println!("✓ LinTab v{} está al día.", info.current);
+    }
     Ok(())
 }
 

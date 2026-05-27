@@ -12,6 +12,7 @@ object StylusCapture {
 
     private const val MAX_PRESSURE = 8191
 
+    /** Direct conversion from raw MotionEvent (bypass pipeline). */
     fun motionEventToProto(
         event: MotionEvent,
         screenWidth: Int,
@@ -34,8 +35,7 @@ object StylusCapture {
         }
 
         val pressure = (event.pressure * MAX_PRESSURE)
-            .toInt()
-            .coerceIn(0, MAX_PRESSURE)
+            .toInt().coerceIn(0, MAX_PRESSURE)
 
         val tiltDeg = Math.toDegrees(
             event.getAxisValue(MotionEvent.AXIS_TILT).toDouble()
@@ -54,6 +54,28 @@ object StylusCapture {
             .setTool(toolType)
             .setAction(action)
             .setTimestampUs(event.eventTime * 1_000L)
+            .setScreenWidth(screenWidth)
+            .setScreenHeight(screenHeight)
+            .build()
+    }
+
+    /** Pipeline-processed path: converts a CommitPoint to TabletEvent proto. */
+    fun commitPointToProto(
+        point: InputPipeline.CommitPoint,
+        toolType: ToolType,
+        screenWidth: Int,
+        screenHeight: Int,
+    ): TabletEvent {
+        val action = if (point.isUp) ActionType.ACTION_UP else ActionType.ACTION_MOVE
+        return TabletEvent.newBuilder()
+            .setX(point.x.toInt())
+            .setY(point.y.toInt())
+            .setPressure(point.pressure)
+            .setTiltX(point.tiltX)
+            .setTiltY(point.tiltY)
+            .setTool(toolType)
+            .setAction(action)
+            .setTimestampUs(point.timestampMs * 1_000L)
             .setScreenWidth(screenWidth)
             .setScreenHeight(screenHeight)
             .build()

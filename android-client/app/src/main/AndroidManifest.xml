@@ -36,11 +36,23 @@
             </intent-filter>
         </activity>
 
-        <!-- Main drawing canvas (started after permissions) -->
+        <!-- Mode selection (first run) -->
+        <activity
+            android:name=".ui.ModeSelectionActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <!-- Hardware benchmark & calibration -->
+        <activity
+            android:name=".ui.BenchmarkActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <!-- Main drawing canvas -->
         <activity
             android:name=".ui.MainActivity"
             android:exported="false"
-            android:screenOrientation="portrait"/>
+            android:screenOrientation="portrait" />
 
     </application>
 

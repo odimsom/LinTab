@@ -40,6 +40,8 @@ pub enum IpcCommand {
     },
     /// Returns last received pressure/tilt snapshot for the GUI to display.
     GetPrecision,
+    /// Check GitHub Releases for a newer version.
+    CheckUpdate,
 }
 
 /// Response envelope sent back for every command.

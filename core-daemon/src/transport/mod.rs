@@ -66,6 +66,17 @@ fn apply_rotation(ax: i32, ay: i32, rotation: u32) -> (i32, i32) {
     }
 }
 
+/// Apply rotation to a movement delta (Jacobian of apply_rotation).
+/// Used in relative mode so rotation affects cursor direction, not just absolute position.
+fn apply_rotation_delta(dx: i32, dy: i32, rotation: u32) -> (i32, i32) {
+    match rotation {
+        90  => (dy, -dx),
+        180 => (-dx, -dy),
+        270 => (-dy, dx),
+        _   => (dx, dy),
+    }
+}
+
 // ── Daemon transport loop ─────────────────────────────────────────────────────
 
 pub async fn serve_loop(
@@ -155,13 +166,19 @@ async fn handle_stream(
                     // Don't move cursor on pen down
                     (virt_x, virt_y)
                 } else {
-                    // Compute delta from reference, scale to uinput space
-                    let raw_scale_x = if ev.screen_width  > 0 { 32767.0 / ev.screen_width  as f32 } else { 1.0 };
-                    let raw_scale_y = if ev.screen_height > 0 { 32767.0 / ev.screen_height as f32 } else { 1.0 };
-                    let dx = ((ev.x - ref_x) as f32 * raw_scale_x) as i32;
-                    let dy = ((ev.y - ref_y) as f32 * raw_scale_y) as i32;
+                    // Uniform scale: use the tablet's longer dimension so 1 physical
+                    // pixel produces the same number of uinput units in every direction.
+                    // Asymmetric per-axis scale caused X to feel ~3x faster than Y on
+                    // portrait tablets, and made rotation have no perceptible effect.
+                    let longer = ev.screen_width.max(ev.screen_height);
+                    let scale = if longer > 0 { 32767.0 / longer as f32 } else { 1.0 };
+                    let raw_dx = ((ev.x - ref_x) as f32 * scale) as i32;
+                    let raw_dy = ((ev.y - ref_y) as f32 * scale) as i32;
                     ref_x = ev.x;
                     ref_y = ev.y;
+                    // Apply rotation to the delta so the configured rotation affects
+                    // cursor direction in relative mode, not just absolute position.
+                    let (dx, dy) = apply_rotation_delta(raw_dx, raw_dy, map.rotation);
                     virt_x = (virt_x + dx).clamp(0, 32767);
                     virt_y = (virt_y + dy).clamp(0, 32767);
                     (virt_x, virt_y)

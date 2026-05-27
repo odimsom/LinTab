@@ -14,6 +14,19 @@ Distribuido bajo la licencia **GPL-3.0**. Todos los archivos fuente incluyen el 
 
 ---
 
+## 📦 Instalación
+
+Consulta la guía que corresponde a tu caso:
+
+| Caso | Guía |
+|---|---|
+| Inicio rápido | [INSTALL.md](INSTALL.md) |
+| Conexión **USB** (recomendado) | [docs/INSTALL-USB.md](docs/INSTALL-USB.md) |
+| Conexión **WiFi** | [docs/INSTALL-WIFI.md](docs/INSTALL-WIFI.md) |
+| Tablet **antigua / gama baja** | [docs/INSTALL-OLD-TABLET.md](docs/INSTALL-OLD-TABLET.md) |
+
+---
+
 ## 🚀 Características Principales
 
 - **Zero-Lag Pipeline** — Comunicación primaria por USB vía ADB Port Forwarding; fallback automático a UDP sobre Wi-Fi.

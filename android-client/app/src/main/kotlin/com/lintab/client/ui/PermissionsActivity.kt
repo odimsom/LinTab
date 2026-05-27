@@ -17,23 +17,25 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.lintab.client.R
+import com.lintab.client.capture.Prefs
 import com.lintab.client.databinding.ActivityPermissionsBinding
 
 class PermissionsActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityPermissionsBinding
 
-    private val requiredPermissions: Array<String> get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        arrayOf(Manifest.permission.NEARBY_WIFI_DEVICES)
-    } else {
-        arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
-    }
+    private val requiredPermissions: Array<String>
+        get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            arrayOf(Manifest.permission.NEARBY_WIFI_DEVICES)
+        } else {
+            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { _ ->
         updateNetworkStatus()
-        launchMain()
+        launchNext()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -42,13 +44,12 @@ class PermissionsActivity : AppCompatActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         WindowInsetsControllerCompat(window, window.decorView).apply {
             hide(WindowInsetsCompat.Type.systemBars())
-            systemBarsBehavior =
-                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         if (allPermissionsGranted()) {
-            launchMain()
+            launchNext()
             return
         }
 
@@ -57,13 +58,8 @@ class PermissionsActivity : AppCompatActivity() {
 
         updateNetworkStatus()
 
-        binding.btnContinue.setOnClickListener {
-            permissionLauncher.launch(requiredPermissions)
-        }
-
-        binding.btnSkip.setOnClickListener {
-            launchMain()
-        }
+        binding.btnContinue.setOnClickListener { permissionLauncher.launch(requiredPermissions) }
+        binding.btnSkip.setOnClickListener     { launchNext() }
     }
 
     private fun allPermissionsGranted(): Boolean = requiredPermissions.all {
@@ -79,8 +75,14 @@ class PermissionsActivity : AppCompatActivity() {
         binding.dotNetwork.visibility = if (granted) View.INVISIBLE else View.VISIBLE
     }
 
-    private fun launchMain() {
-        startActivity(Intent(this, MainActivity::class.java))
+    /** Route: first run → ModeSelectionActivity; returning user → MainActivity. */
+    private fun launchNext() {
+        val target = if (Prefs.hasMode(this)) {
+            MainActivity::class.java
+        } else {
+            ModeSelectionActivity::class.java
+        }
+        startActivity(Intent(this, target))
         finish()
     }
 }

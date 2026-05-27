@@ -38,6 +38,7 @@ enum IpcCommand<'a> {
         relative_mode: bool,
     },
     GetPrecision,
+    CheckUpdate,
 }
 
 #[derive(Deserialize)]
@@ -134,4 +135,9 @@ pub async fn set_tablet_mapping(
 #[tauri::command]
 pub async fn get_precision() -> Result<Value, String> {
     call_daemon(&IpcCommand::GetPrecision).await
+}
+
+#[tauri::command]
+pub async fn check_for_update() -> Result<Value, String> {
+    call_daemon(&IpcCommand::CheckUpdate).await
 }

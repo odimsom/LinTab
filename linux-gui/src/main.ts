@@ -327,6 +327,54 @@ function updatePrecision(pressure: number, tiltX: number, tiltY: number): void {
   valTiltY.textContent = `${tiltY >= 0 ? "+" : ""}${tiltY}°`;
 }
 
+// ── Update check ──────────────────────────────────────────────────────────────
+
+interface UpdatePayload {
+  update_available: boolean;
+  current: string;
+  latest: string;
+  url: string;
+}
+
+async function checkForUpdate(): Promise<void> {
+  try {
+    const data = await invoke<UpdatePayload>("check_for_update");
+    if (data?.update_available) {
+      showUpdateBanner(data.latest, data.current, data.url);
+    }
+  } catch {
+    // Non-critical — daemon may not be running yet on first check
+  }
+}
+
+function showUpdateBanner(latest: string, current: string, url: string): void {
+  if (document.getElementById("update-banner")) return;
+
+  const banner = document.createElement("div");
+  banner.id = "update-banner";
+  banner.style.cssText = `
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: #FF4F00; color: #121212;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    padding: 8px 16px; display: flex; align-items: center;
+    justify-content: space-between; z-index: 9999;
+    letter-spacing: 0.08em;
+  `;
+  banner.innerHTML = `
+    <span>ACTUALIZACIÓN DISPONIBLE — v${current} → v${latest}</span>
+    <span style="display:flex;gap:12px">
+      <a href="${url}" target="_blank"
+         style="color:#121212;font-weight:bold;text-decoration:underline;">
+        DESCARGAR_
+      </a>
+      <span id="close-update" style="cursor:pointer;font-weight:bold;">✕</span>
+    </span>
+  `;
+  document.body.appendChild(banner);
+  document.getElementById("close-update")?.addEventListener("click", () => banner.remove());
+  log(`ACTUALIZACIÓN DISPONIBLE: v${latest} — ${url}`, "warn");
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 btnScan.addEventListener("click", handleScan);
@@ -335,4 +383,6 @@ document.addEventListener("DOMContentLoaded", () => {
   log("LinTab GUI iniciando…");
   refreshStatus();
   setInterval(refreshPrecision, 150);
+  // Delay update check to let the daemon start first
+  setTimeout(checkForUpdate, 4_000);
 });

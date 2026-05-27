@@ -15,7 +15,7 @@ use crate::{
     ipc::{socket_path, IpcCommand, IpcResponse},
     scan, setup, transport,
     transport::{SharedLastEvent, SharedMapping},
-    uinput,
+    uinput, updater,
 };
 use anyhow::Result;
 use mdns_sd::ServiceDaemon;
@@ -179,6 +179,19 @@ async fn dispatch(
                 "tilt_x":   snap.tilt_x,
                 "tilt_y":   snap.tilt_y,
             }))
+        }
+
+        IpcCommand::CheckUpdate => {
+            match updater::check().await {
+                Ok(info) => IpcResponse::ok(serde_json::json!({
+                    "current":          info.current,
+                    "latest":           info.latest,
+                    "update_available": info.update_available,
+                    "url":              info.url,
+                    "changelog":        info.changelog,
+                })),
+                Err(e) => IpcResponse::err(format!("No se pudo verificar actualizaciones: {e}")),
+            }
         }
     }
 }
