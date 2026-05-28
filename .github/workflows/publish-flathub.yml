@@ -75,11 +75,11 @@ jobs:
           git commit -m "Update to v${VERSION}"
           git push origin "$BRANCH"
 
+          BODY="Automated update to LinTab v${VERSION}. See release notes: https://github.com/${{ github.repository }}/releases/tag/v${VERSION}"
           gh pr create \
             --repo "flathub/com.lintab.LinTab" \
             --title "Update to v${VERSION}" \
-            --body "Automated update to LinTab v${VERSION}.
-See release notes: https://github.com/${{ github.repository }}/releases/tag/v${VERSION}" \
+            --body "$BODY" \
             --base master \
             --head "$BRANCH"
         env:

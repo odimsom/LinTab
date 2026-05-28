@@ -1,9 +1,17 @@
 name: Publish to Snap Store
 
+# ── DISABLED — uncomment the workflow_run trigger once SNAPCRAFT_STORE_CREDENTIALS is set ──
 on:
-  workflow_run:
-    workflows: ["Build & Release Packages"]
-    types: [completed]
+  workflow_dispatch:
+    inputs:
+      placeholder:
+        description: "This workflow is disabled. Set SNAPCRAFT_STORE_CREDENTIALS and restore the workflow_run trigger."
+        required: false
+
+# on:
+#   workflow_run:
+#     workflows: ["Build & Release Packages"]
+#     types: [completed]
 
 # ── Secrets required ───────────────────────────────────────────────────────────
 # SNAPCRAFT_STORE_CREDENTIALS — exported with:
