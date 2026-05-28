@@ -204,13 +204,25 @@ jobs:
     name: Upload to GitHub Release
     needs: [build-tarball, build-deb, build-rpm, build-gui]
     runs-on: ubuntu-22.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           merge-multiple: true
 
       - name: List artifacts
         run: ls -lh
+
+      - name: Create release if it does not exist
+        run: |
+          gh release view "$GITHUB_REF_NAME" 2>/dev/null || \
+          gh release create "$GITHUB_REF_NAME" \
+            --title "LinTab $GITHUB_REF_NAME" \
+            --generate-notes
 
       - name: Upload to release
         run: |
@@ -221,6 +233,3 @@ jobs:
             LinTab_*.AppImage \
             lintab-gui_*.deb \
             --clobber
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
