@@ -19,6 +19,11 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"
         android:maxSdkVersion="32" />
 
+    <!-- Instalar el APK de actualización descargado dentro de la app
+         (Android 8+ pide este permiso especial para lanzar el instalador
+         desde una app propia). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <application
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
@@ -53,6 +58,18 @@
             android:name=".ui.MainActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
+
+        <!-- Expone el APK descargado en caché al instalador del sistema
+             vía content:// URI (necesario desde Android 7+). -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
     </application>
 

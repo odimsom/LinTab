@@ -14,7 +14,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import com.google.android.material.snackbar.Snackbar
 import com.lintab.client.BuildConfig
 import com.lintab.client.capture.HardwareProfiler
 import com.lintab.client.capture.InputPipeline
@@ -81,6 +80,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.fabMenu.setOnClickListener { openModeSelection() }
 
+        UpdateDialogs.maybeShowWhatsNew(this, BuildConfig.VERSION_NAME)
         checkForUpdate()
     }
 
@@ -88,18 +88,7 @@ class MainActivity : AppCompatActivity() {
         CoroutineScope(Dispatchers.Main).launch {
             val result = UpdateChecker.check(BuildConfig.VERSION_NAME) ?: return@launch
             if (result.updateAvailable) {
-                Snackbar.make(
-                    binding.root,
-                    "Nueva versión disponible: v${result.latest}",
-                    Snackbar.LENGTH_LONG,
-                ).setAction("Ver") {
-                    startActivity(
-                        android.content.Intent(
-                            android.content.Intent.ACTION_VIEW,
-                            android.net.Uri.parse(result.downloadUrl),
-                        )
-                    )
-                }.show()
+                UpdateDialogs.showUpdateAvailable(this@MainActivity, result)
             }
         }
     }

@@ -5,58 +5,142 @@ package com.lintab.client.util
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
 object UpdateChecker {
 
-    private const val RELEASE_URL =
-        "https://api.github.com/repos/odimsom/LinTab/releases/latest"
+    private const val OWNER = "dev-fcastro"
+    private const val REPO = "LinTab"
+    private const val LATEST_RELEASE_URL =
+        "https://api.github.com/repos/$OWNER/$REPO/releases/latest"
 
     data class Result(
         val updateAvailable: Boolean,
         val current: String,
         val latest: String,
-        val downloadUrl: String,
+        val htmlUrl: String,
+        val apkDownloadUrl: String?,
     )
 
     /**
-     * Queries GitHub Releases and returns update status.
-     * Returns null on network error or if the response cannot be parsed.
-     * Must be called from a coroutine — runs on [Dispatchers.IO].
+     * Consulta el último release publicado en GitHub y lo compara contra la
+     * versión instalada. Nunca lanza: sin conexión o cualquier error de red
+     * simplemente devuelve null.
      */
     suspend fun check(currentVersion: String): Result? = withContext(Dispatchers.IO) {
         runCatching {
-            val conn = (URL(RELEASE_URL).openConnection() as HttpURLConnection).apply {
-                requestMethod = "GET"
-                setRequestProperty("User-Agent", "lintab-android/$currentVersion")
-                setRequestProperty("Accept", "application/vnd.github+json")
-                connectTimeout = 5_000
-                readTimeout    = 5_000
-            }
+            val body = getJson(LATEST_RELEASE_URL, currentVersion) ?: return@runCatching null
 
-            val body = conn.inputStream.bufferedReader().use { it.readText() }
-            conn.disconnect()
-
-            val tagName = """\"tag_name\"\s*:\s*\"([^\"]+)\"""".toRegex()
-                .find(body)?.groupValues?.get(1) ?: return@runCatching null
-
-            val htmlUrl = """\"html_url\"\s*:\s*\"([^\"]+)\"""".toRegex()
-                .find(body)?.groupValues?.get(1) ?: ""
-
+            val tagName = extract(body, "tag_name") ?: return@runCatching null
+            val htmlUrl = extract(body, "html_url")
+                ?: "https://github.com/$OWNER/$REPO/releases/latest"
             val latest = tagName.trimStart('v')
+
             Result(
                 updateAvailable = isNewer(latest, currentVersion),
-                current         = currentVersion,
-                latest          = latest,
-                downloadUrl     = htmlUrl,
+                current = currentVersion,
+                latest = latest,
+                htmlUrl = htmlUrl,
+                apkDownloadUrl = extractApkUrl(body),
             )
         }.getOrNull()
     }
 
+    /**
+     * Notas del release [version] (sin el prefijo "v"), para el diálogo de
+     * "novedades" que se muestra una vez tras actualizar. Null si falla o si
+     * el release no tiene body.
+     */
+    suspend fun fetchReleaseNotes(version: String): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            val url = "https://api.github.com/repos/$OWNER/$REPO/releases/tags/v$version"
+            val body = getJson(url, version) ?: return@runCatching null
+            extract(body, "body")?.unescapeJson()?.trim()?.ifEmpty { null }
+        }.getOrNull()
+    }
+
+    /**
+     * Descarga el APK a [destination], reportando progreso 0..1 por
+     * [onProgress]. Lanza si la descarga falla; el caller decide cómo
+     * mostrarlo.
+     */
+    suspend fun downloadApk(
+        url: String,
+        destination: File,
+        onProgress: ((Float) -> Unit)? = null,
+    ): File = withContext(Dispatchers.IO) {
+        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+            instanceFollowRedirects = true
+            requestMethod = "GET"
+            connectTimeout = 8_000
+            readTimeout = 15_000
+        }
+        if (conn.responseCode != HttpURLConnection.HTTP_OK) {
+            conn.disconnect()
+            throw IllegalStateException("Descarga falló (HTTP ${conn.responseCode})")
+        }
+        val total = conn.contentLength
+        var received = 0
+        conn.inputStream.use { input ->
+            FileOutputStream(destination).use { output ->
+                val buffer = ByteArray(8 * 1024)
+                var read: Int
+                while (input.read(buffer).also { read = it } != -1) {
+                    output.write(buffer, 0, read)
+                    received += read
+                    if (total > 0) onProgress?.invoke(received.toFloat() / total)
+                }
+            }
+        }
+        conn.disconnect()
+        destination
+    }
+
+    private fun getJson(url: String, currentVersion: String): String? {
+        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            setRequestProperty("User-Agent", "lintab-android/$currentVersion")
+            setRequestProperty("Accept", "application/vnd.github+json")
+            connectTimeout = 5_000
+            readTimeout = 5_000
+        }
+        if (conn.responseCode != HttpURLConnection.HTTP_OK) {
+            conn.disconnect()
+            return null
+        }
+        val body = conn.inputStream.bufferedReader().use { it.readText() }
+        conn.disconnect()
+        return body
+    }
+
+    private fun extract(json: String, key: String): String? =
+        """"$key"\s*:\s*"((?:[^"\\]|\\.)*)"""".toRegex().find(json)?.groupValues?.get(1)
+
+    /**
+     * Busca el primer asset cuyo "name" termine en ".apk" y devuelve su
+     * "browser_download_url". No hay parser JSON real en el proyecto, así
+     * que se asume el orden de campos que devuelve hoy la API de GitHub
+     * (name antes que browser_download_url dentro del mismo asset).
+     */
+    private fun extractApkUrl(json: String): String? =
+        """"name"\s*:\s*"([^"]+\.apk)"[\s\S]*?"browser_download_url"\s*:\s*"([^"]+)"""".toRegex()
+            .find(json)?.groupValues?.get(2)
+
+    private fun String.unescapeJson(): String =
+        replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\\"", "\"").replace("\\\\", "\\")
+
     private fun isNewer(candidate: String, base: String): Boolean {
         fun parse(v: String) = v.split('.').mapNotNull { it.toIntOrNull() }
-            .let { Triple(it.getOrElse(0) { 0 }, it.getOrElse(1) { 0 }, it.getOrElse(2) { 0 }) }
-        return parse(candidate) > parse(base)
+        val a = parse(candidate)
+        val b = parse(base)
+        for (i in 0 until maxOf(a.size, b.size)) {
+            val ai = a.getOrElse(i) { 0 }
+            val bi = b.getOrElse(i) { 0 }
+            if (ai != bi) return ai > bi
+        }
+        return false
     }
 }

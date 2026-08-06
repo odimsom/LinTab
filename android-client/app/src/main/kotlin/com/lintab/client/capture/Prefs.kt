@@ -18,6 +18,7 @@ object Prefs {
     private const val KEY_FAKE_HOVER       = "fake_hover"
     private const val KEY_HW_TIER          = "hw_tier"
     private const val KEY_BENCHMARK_DONE   = "benchmark_done"
+    private const val KEY_LAST_SEEN_VERSION = "last_seen_version"
 
     private fun sp(ctx: Context): SharedPreferences =
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
@@ -64,4 +65,11 @@ object Prefs {
 
     fun isBenchmarkDone(ctx: Context): Boolean =
         sp(ctx).getBoolean(KEY_BENCHMARK_DONE, false)
+
+    fun getLastSeenVersion(ctx: Context): String? =
+        sp(ctx).getString(KEY_LAST_SEEN_VERSION, null)
+
+    fun setLastSeenVersion(ctx: Context, version: String) {
+        sp(ctx).edit().putString(KEY_LAST_SEEN_VERSION, version).apply()
+    }
 }

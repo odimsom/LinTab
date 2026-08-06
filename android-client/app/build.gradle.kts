@@ -15,8 +15,8 @@ android {
         applicationId = "com.lintab.client"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "0.3.0"
+        versionCode = 4
+        versionName = "0.3.1"
     }
 
     signingConfigs {
@@ -42,7 +42,10 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
 
-    buildFeatures { viewBinding = true }
+    buildFeatures {
+        viewBinding = true
+        buildConfig = true
+    }
 }
 
 dependencies {
